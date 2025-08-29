@@ -1,20 +1,15 @@
+import { Perlin } from "_Perlin";
 import * as hz from "horizon/core";
 
-// Deterministic RNG with numeric or string seed
-export class RNG {
-    private state: number;
-    private static I: RNG | undefined = undefined;
+export class ORandom {
+    public perlin!: Perlin;
 
-    public static get(): RNG {
-        if (RNG.I == undefined) {
-            RNG.I = new RNG(`Default`);
-        }
-        return RNG.I;
-    }
+    private state: number;
 
     constructor(public seed: number | string) {
-        this.state = typeof seed === "number" ? seed >>> 0 : RNG.fnv1a32(seed);
+        this.state = typeof seed === "number" ? seed >>> 0 : ORandom.fnv1a32(seed);
         if (this.state === 0) this.state = 0x9e3779b9; // avoid trivial zero
+        this.perlin = new Perlin('seed');
     }
 
     // FNV-1a 32-bit hash (string -> 32-bit seed)
@@ -76,6 +71,25 @@ export class RNG {
         if (p <= 0) return false;
         if (p >= 1) return true;
         return this.next() < p;
+    }
+
+    // Marsaglia method: sample a unit quaternion uniformly on S^3
+    public rotation(): hz.Quaternion {
+        const u1 = this.next();
+        const u2 = this.next();
+        const u3 = this.next();
+
+        const s1 = Math.sqrt(1 - u1);
+        const s2 = Math.sqrt(u1);
+        const a = 2 * Math.PI * u2;
+        const b = 2 * Math.PI * u3;
+
+        const x = s1 * Math.sin(a);
+        const y = s1 * Math.cos(a);
+        const z = s2 * Math.sin(b);
+        const w = s2 * Math.cos(b);
+
+        return new hz.Quaternion(x, y, z, w);
     }
 
     // In-place Fisher–Yates shuffle

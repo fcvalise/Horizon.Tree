@@ -2,6 +2,8 @@ import * as hz from 'horizon/core';
 import { TMath } from '_TreeMath';
 import { TreeTween } from '_TreeTween';
 import { UpdateUIBar } from 'UIBarController';
+import { Library } from '_Library';
+import { TreeEvent } from '_TreeEvent';
 
 type PooledObject = { entity: hz.Entity | undefined; inUse: boolean; };
 type TrailObject = { trail: hz.TrailGizmo; followEntity: hz.Entity | undefined, inUse: boolean; };
@@ -22,7 +24,7 @@ export class TreePool extends hz.Component<typeof TreePool> {
     private particleSpawn!: hz.ParticleGizmo;
     private particleRelease!: hz.ParticleGizmo;
     private poolCount: number = 0;
-    private poolLimit: number = 1200;
+    private poolLimit: number = 400;
     
     
     preStart() { TreePool.I = this; }
@@ -32,24 +34,26 @@ export class TreePool extends hz.Component<typeof TreePool> {
         this.particleRelease = this.props.particleRelease!.as(hz.ParticleGizmo);
         this.startTrail();
 
-        this.createAsset(641971635621076, new hz.Vec3(0.1, 0.1, 0.5), this.particleSpawn);
-        this.async.setTimeout(() => {
-            this.createAsset(809883814725506, new hz.Vec3(0.2, 0.2, 0.2), this.particleSpawn);
-        }, 100);
+        this.connectNetworkBroadcastEvent(TreeEvent.resetAllTree, () => { this.resetAll(); })
+
+        // this.createAsset(Library.matter, new hz.Vec3(0.1, 0.1, 0.5), this.particleSpawn);
+        // this.async.setTimeout(() => {
+        //     this.createAsset(Library.matter, new hz.Vec3(0.2, 0.2, 0.2), this.particleSpawn);
+        // }, 100);
         
-        this.async.setTimeout(() => {
-            this.createAsset(641971635621076, new hz.Vec3(0.2, 0.2, 0.2), this.particleSpawn);
-        }, 200);
-        this.async.setTimeout(() => {
-            this.createAsset(809883814725506, new hz.Vec3(0.2, 0.2, 0.2), this.particleSpawn);
-        }, 300);
+        // this.async.setTimeout(() => {
+        //     this.createAsset(Library.matter, new hz.Vec3(0.2, 0.2, 0.2), this.particleSpawn);
+        // }, 200);
+        // this.async.setTimeout(() => {
+        //     this.createAsset(Library.matter, new hz.Vec3(0.2, 0.2, 0.2), this.particleSpawn);
+        // }, 300);
         
-        this.async.setTimeout(() => {
-            this.createAsset(641971635621076, new hz.Vec3(0.2, 0.2, 0.2), this.particleSpawn);
-        }, 400);
-        this.async.setTimeout(() => {
-            this.createAsset(809883814725506, new hz.Vec3(0.2, 0.2, 0.2), this.particleSpawn);
-        }, 500);
+        // this.async.setTimeout(() => {
+        //     this.createAsset(Library.segementDynamic, new hz.Vec3(0.2, 0.2, 0.2), this.particleSpawn);
+        // }, 400);
+        // this.async.setTimeout(() => {
+        //     this.createAsset(Library.leafDynamic, new hz.Vec3(0.2, 0.2, 0.2), this.particleSpawn);
+        // }, 500);
     }
 
     private async createAsset(id: number, scale: hz.Vec3, particle: hz.ParticleGizmo) {
@@ -60,15 +64,15 @@ export class TreePool extends hz.Component<typeof TreePool> {
         const position = TMath.vAdd(this.entity.position.get(), TMath.vScale(random, 1));
         const rot = hz.Quaternion.fromEuler(TMath.vScale(random, 360));
         const segEnts = await this.world.spawnAsset(asset, position, rot, hz.Vec3.zero);
-        this.tween.scaleTo(segEnts[0], scale, 0.5);
+        // this.tween.scaleTo(segEnts[0], scale, 0.5);
         const available = { entity: segEnts[0]!, inUse: true };
         this.poolCount++;
         this.park(available, particle);
         pool.push(available);
         if (this.poolCount < this.poolLimit) {
             this.createAsset(id, scale, particle);
-            
         }
+
         this.updateUI();
     }
     
@@ -95,43 +99,39 @@ export class TreePool extends hz.Component<typeof TreePool> {
         pos: hz.Vec3 = hz.Vec3.zero,
         rot: hz.Quaternion = hz.Quaternion.zero,
         scale: hz.Vec3 = hz.Vec3.zero,
-        grabbable: boolean
     ): Promise<hz.Entity | undefined> {
         if (!this.poolMap.has(id)) this.poolMap.set(id, []);
         const pool = this.poolMap.get(id)!;
 
         // reuse
         let available = pool.find(p => !p.inUse);
-        if (available) {
+        if (available && available.entity) {
             available.inUse = true;
-            // available.entity?.interactionMode.set(hz.EntityInteractionMode.Grabbable);
-            // await this.waitFor(() => available!.entity!.interactionMode!.get()! == hz.EntityInteractionMode.Grabbable);
+            available.entity?.simulated.set(false);
+            // await this.waitFor(() => Boolean(available.entity?.simulated.get()!));
             this.attach(available.entity!);
-            this.tween.moveAndScaleTo(available.entity!, hz.Vec3.zero, pos, rot, 0.5 +  Math.random() * 0.5);            
-            // await this.waitFor(() => !this.tween.isTweening(available?.entity!));
+            this.tween.moveAndScaleTo(available.entity!, hz.Vec3.zero, pos, rot, 1.5 +  Math.random() * 1.5);            
+            await this.waitFor(() => !this.tween.isTweening(available?.entity!));
+
             await this.prepare(available, pos, rot, scale);
             await this.waitFor(() => available!.entity!.position!.get()!.distance(pos)! < 0.01);
             this.tween.scaleTo(available.entity!, scale, 0.2 +  Math.random() * 0.1);
-            if (!grabbable) {
-                available.entity?.simulated.set(false);
-                // available.entity?.as(hz.GrabbableEntity).setWhoCanGrab([]);
-            } else {
-                const players = this.world.getPlayers();
-                available.entity?.as(hz.GrabbableEntity).setWhoCanGrab(players);
-                available.entity?.simulated.set(true);
-            }
+            await this.waitFor(() => !this.tween.isTweening(available?.entity!));
+
             this.updateUI();
             this.detach(available.entity!);
+            available.entity?.simulated.set(false);
+
             return available.entity!;
         }
 
-        return undefined;
+        // return undefined;
 
-        // if (this.poolCount > this.poolLimit) {
-        //     return undefined;
-        // }
+        if (this.poolCount > this.poolLimit) {
+            return undefined;
+        }
 
-        // // spawn
+        // spawn
         // const asset = new hz.Asset(BigInt(id));
         // available = { entity: undefined, inUse: true };
         // pool.push(available);
@@ -141,7 +141,7 @@ export class TreePool extends hz.Component<typeof TreePool> {
         // this.tween.scaleTo(available.entity!, scale, Math.random());
         // console.log(`Pool size : ${this.poolCount++}`);
 
-        return available!.entity;
+        // return available!.entity;
     }
 
     public isScaled(entity: hz.Entity) {
@@ -157,7 +157,9 @@ export class TreePool extends hz.Component<typeof TreePool> {
         object.inUse = true;
         object.entity!.position.set(pos);
         object.entity!.rotation.set(rot);
-        object.entity!.scale.set(hz.Vec3.zero);
+        object.entity!.scale.set(scale);
+
+        // object.entity!.scale.set(hz.Vec3.zero);
         this.audio.position.set(pos);
         this.audio.play({fade: 0.05});
     }
@@ -187,14 +189,12 @@ export class TreePool extends hz.Component<typeof TreePool> {
     private async park(item: PooledObject, particle: hz.ParticleGizmo | undefined = undefined) {
         await this.waitFor(() => Boolean(item.entity));
         await this.waitFor(() => !this.tween.isTweening(item.entity!))
-        item.entity?.interactionMode.set(hz.EntityInteractionMode.Physics);
-        await this.waitFor(() => item.entity?.interactionMode.get() == hz.EntityInteractionMode.Physics);
+        item.entity?.simulated.set(true);
+        await this.waitFor(() =>  item.entity?.simulated.get()!)
         await this.waitFor(() => this.hasFallen(item.entity!));
         const particlePos = item.entity?.getPhysicsBounds().center!;
         if (particle) particle.position.set(particlePos);
         item.entity?.simulated.set(false);
-        // item.entity?.interactionMode.set(hz.EntityInteractionMode.Grabbable);
-        // await this.waitFor(() => item.entity?.interactionMode.get() == hz.EntityInteractionMode.Grabbable);
         if (particle) particle.play();
         item.inUse = false;
         this.updateUI();
@@ -204,7 +204,7 @@ export class TreePool extends hz.Component<typeof TreePool> {
         // const isStopped = TMath.vLen(entity?.as(hz.PhysicalEntity).velocity.get()!) < 0.01;
         const isStopped = TMath.vLen(entity?.as(hz.PhysicalEntity).velocity.get()!) < 0.01;
 
-        return isStopped || entity.position.get().y < 0.3;
+        return isStopped;// || entity.position.get().y < 0.3;
     }
 
     waitFor(condition: () => boolean, checkEveryMs = 50): Promise<void> {
@@ -251,7 +251,7 @@ export class TreePool extends hz.Component<typeof TreePool> {
         let trail = this.trailList.find(p => p.followEntity == entity)!;
         trail.followEntity = undefined;
         trail.trail.stop();
-        this.async.setTimeout(() => trail.inUse = false, 10);
+        this.async.setTimeout(() => trail.inUse = false, 100);
     }
 
     private update(deltaTime: number) {

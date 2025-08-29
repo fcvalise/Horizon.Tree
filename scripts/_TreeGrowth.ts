@@ -9,6 +9,7 @@ import { TreeLeaves } from "_TreeLeaves";
 import { TreePool } from "_TreePool";
 import { TreeEvent } from "_TreeEvent";
 import { TreeTween } from "_TreeTween";
+import { UpdateUIBar } from "UIBarController";
 
 export type Bud = {
     pos: hz.Vec3;
@@ -43,6 +44,9 @@ export class TreeGrowth {
     private budRoot!: Bud;
     private isStopped: boolean = false;
 
+    public static count = 0;
+
+
     constructor(
         private position: hz.Vec3,
         private component: hz.Component,
@@ -55,6 +59,10 @@ export class TreeGrowth {
         this.leaves = new TreeLeaves(component, settings.render, settings.leaf, this.rng);
 
         this.createRoot();
+
+        this.component.connectNetworkBroadcastEvent(TreeEvent.pruneTree, (payload) => {
+            this.prune(payload.entity);
+        });
     }
 
     public createRoot() {
@@ -113,6 +121,7 @@ export class TreeGrowth {
     public prune(entity: hz.Entity) {
         const budRoot = this.budMap.get(entity);
         if (budRoot) {
+            console.log(JSON.stringify(this.settings));
             this.removeBranch(budRoot);
             if (this.settings.growth.growAfterPrune) {
                 budRoot.children = [];
@@ -162,17 +171,24 @@ export class TreeGrowth {
         const scale = new hz.Vec3(width, width, bud.length);
 
         const id = this.settings.render.segmentAssetId;
-        let entity = await TreePool.I.acquire(id, pos, rot, scale, bud.depth == 0 || bud.isBranchStart);
+        let entity = await TreePool.I.acquire(id, pos, rot, scale);
+        
+        // let entityPromise = await this.component.world.spawnAsset(new hz.Asset(BigInt(id)), pos, rot, scale);
+        // let entity = entityPromise[0];
+        // this.component.sendNetworkBroadcastEvent(UpdateUIBar, {
+        //     id: 'StaticValue',
+        //     percent: 0,
+        //     current: TreeGrowth.count++,
+        //     total: TreeGrowth.count++
+        // });
+        
         if (entity) {
+            entity.as(hz.MeshEntity).style.tintColor.set(new hz.Color(0.01, 0.01, 0.01));
             await TreeTween.waitFor(this.component, () => TreePool.I.isScaled(entity!));
             bud.entityList.push(entity);
             this.budMap.set(entity, bud);
     
-            this.component.connectCodeBlockEvent(entity, hz.CodeBlockEvents.OnGrabStart, () => {
-                this.prune(entity!);
-            });
-    
-            if (bud.depth / this.settings.growth.maxDepth > 0.5 && bud.length > this.settings.growth.segmentLength * 0.4) {
+            if (bud.depth / this.settings.growth.maxDepth > 0.4) {// && bud.length > this.settings.growth.segmentLength * 0.4) {
                 await this.leaves.placeLeaves(bud, dir, bud.length);
             }
             bud.created = true;

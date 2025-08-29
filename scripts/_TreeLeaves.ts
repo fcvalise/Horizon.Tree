@@ -1,10 +1,11 @@
 import { RNG } from "_RNG";
-import { Bud } from "_TreeGrowth";
+import { Bud, TreeGrowth } from "_TreeGrowth";
 import { TMath } from "_TreeMath";
 import { TreePool } from "_TreePool";
 import { LeafSettings, RenderSettings } from "_TreeSettings";
 import { TreeTween } from "_TreeTween";
 import * as hz from "horizon/core";
+import { UpdateUIBar } from "UIBarController";
 
 export class TreeLeaves {
     constructor(
@@ -25,8 +26,18 @@ export class TreeLeaves {
         const scale = new hz.Vec3(s, s, s);
 
         const id = this.renderSettings.leafAssetId!;
-        const entity = await TreePool.I.acquire(id, basePos, rot, scale, false);
+        const entity = await TreePool.I.acquire(id, basePos, rot, scale);
+        // let entityPromise = await this.component.world.spawnAsset(new hz.Asset(BigInt(id)), basePos, rot, scale);
+        // let entity = entityPromise[0];
+        // this.component.sendNetworkBroadcastEvent(UpdateUIBar, {
+        //     id: 'StaticValue',
+        //     percent: 0,
+        //     current: TreeGrowth.count++,
+        //     total: TreeGrowth.count++
+        // });
+
         if (entity) {
+            entity.as(hz.MeshEntity).style.tintColor.set(new hz.Color(0.8, 0.94, 0.1));
             bud.entityList?.push(entity);
         }
     };
