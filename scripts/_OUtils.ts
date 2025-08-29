@@ -1,4 +1,4 @@
-import { OWrapper } from "_OManager";
+import { OWrapper } from "_OWrapper";
 
 export class OUtils {
     public static waitFor(wrapper: OWrapper, condition: () => boolean, checkEveryMs = 50): Promise<void> {

@@ -1,4 +1,5 @@
-import { OisifManager, OWrapper } from '_OManager';
+import { OisifManager } from '_OManager';
+import { OWrapper } from '_OWrapper';
 import * as hz from 'horizon/core';
 
 type Wave = { ampDeg: number; freq: number; phase: number; dirDeg: number; };

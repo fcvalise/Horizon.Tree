@@ -5,7 +5,6 @@ import { TreeGrowth } from "_TreeGrowth";
 import { Library } from "_Library";
 import { RNG } from "_RNG";
 import { TreeEvent } from "_TreeEvent";
-import { Binding } from "horizon/ui";
 import { TreeDescription } from "_TreeDescription";
 import { StringHelper } from "_StringHelper";
 

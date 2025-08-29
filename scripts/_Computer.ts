@@ -1,6 +1,6 @@
-import { OWrapper } from '_OManager';
-import { TreeEvent } from '_TreeEvent';
 import * as hz from 'horizon/core';
+import { OWrapper } from '_OWrapper';
+import { TreeEvent } from '_TreeEvent';
 
 class Computer extends hz.Component<typeof Computer> {
   private wrapper: OWrapper = new OWrapper(this);
@@ -15,7 +15,7 @@ class Computer extends hz.Component<typeof Computer> {
     this.wrapper.onUpdate((dt) => this.update(dt))
       this.wrapper.component.connectNetworkBroadcastEvent(TreeEvent.spawnTree, (payload) => {
         this.position = payload.position;
-        this.rotation = hz.Quaternion.lookRotation(payload.player.up.get());
+        this.rotation = hz.Quaternion.lookRotation(payload.player.up.get().add(payload.player.forward.get().mul(-1)));
       });
   }
 

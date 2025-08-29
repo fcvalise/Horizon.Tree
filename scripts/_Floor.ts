@@ -1,7 +1,10 @@
 import * as hz from "horizon/core";
-import { OEntity, OisifManager } from "_OManager";
+import { OisifManager } from "_OManager";
 import { TMath } from "_TreeMath";
 import { OUtils } from "_OUtils";
+import { TreeTween } from "_TreeTween";
+import { OEntity } from "_OEntity";
+import "./_OTween";
 
 class Cell {
     constructor(
@@ -17,8 +20,9 @@ class Cell {
 
 export class Floor {
 
+    private tween!: TreeTween;
     private cellArray: Cell[] = [];
-
+    
     constructor(
         private component: hz.Component,
         private gridSize: number,
@@ -28,7 +32,7 @@ export class Floor {
         this.component.connectCodeBlockEvent(this.component.entity, hz.CodeBlockEvents.OnPlayerEnterWorld, (player) => {
             this.component.connectLocalBroadcastEvent(hz.World.onUpdate, ({ deltaTime }) => this.update(player, deltaTime));
         });
-
+        this.tween = new TreeTween(component);
     }
 
     private update(player: hz.Player, deltaTime: number) {
@@ -44,9 +48,10 @@ export class Floor {
                         oEntity.position = cell.position;
                         oEntity.rotation = cell.rotation;
                         oEntity.scale = cell.scale;
+                        oEntity.scaleTo(cell.scale, 0.2);
                     }
                 } else {
-                    cell.oEntity.makeDynamic();
+                    cell.oEntity.makeDynamic()
                 }
             } else if (distance < 25) {
                 if (cell.oEntity) {

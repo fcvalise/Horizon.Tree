@@ -30,15 +30,6 @@ export class TreeSpawner extends hz.Component<typeof TreeSpawner> {
       // this.entity.position.set(position);
       // this.tree = new TreeBase(this, position, { seed: `${position.x * 21839}` });
       // player.applyForce(TMath.vScale(player.forward.get(), -2.5));
-      const oEntity = OisifManager.I.pool.get();
-      if (oEntity) {
-        oEntity.position = position;
-        oEntity.scale = new hz.Vec3(1, 1, 1);
-        oEntity.color = hz.Color.blue;
-        this.async.setTimeout(() => {
-          oEntity.makeStatic();
-        }, (1000));
-      }
       player.showToastMessage("Tree planted", 2000);
   }
 
