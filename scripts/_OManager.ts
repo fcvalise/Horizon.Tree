@@ -2,43 +2,30 @@ import * as hz from "horizon/core";
 import { ORandom } from "_ORandom";
 import { OWrapper } from "_OWrapper";
 import { OPoolManager } from "_OPool";
-
-export class ORaycast {
-    public raycast(oWrapper: OWrapper): hz.RaycastHit | undefined {
-        return undefined;
-    }
-
-    public debug(oWrapper: OWrapper) {
-        if (oWrapper.isServer()) {
-            this.debugServer();
-        } else {
-            this.debugLocal();
-        }
-    }
-
-    private debugServer(): hz.RaycastHit | undefined{
-        console.error(`Raycast debug server is not implemented`);
-        return undefined;
-    }
-
-    private debugLocal(): hz.RaycastHit | undefined{
-        console.error(`Raycast debug server is not implemented`);
-        return undefined;
-    }
-}
+import { OClouds } from "_OClouds";
+import { OEntityManager } from "_OEntityManager";
+import { OTerrain } from "_OTerrain";
 
 export class OisifManager extends hz.Component<typeof OisifManager> {
     public static I: OisifManager;
 
-    private oWrapper!: OWrapper;
+    private wrapper!: OWrapper;
     public pool!: OPoolManager;
-    public random!: ORandom; 
+    public manager!: OEntityManager;
+    public random!: ORandom;
+
+    private cloud!: OClouds;
+    private terrain!: OTerrain;
     
     public preStart() {
         OisifManager.I = this;
-        this.random = new ORandom('OisifTes');
-        this.oWrapper = new OWrapper(this);
-        this.pool = new OPoolManager(this.oWrapper);
+        this.random = new ORandom('Oisif');
+        this.wrapper = new OWrapper(this);
+        this.pool = new OPoolManager(this.wrapper);
+        this.manager = new OEntityManager(this.wrapper, this.pool);
+
+        this.cloud = new OClouds(this.wrapper, this.pool, this.random);
+        this.terrain = new OTerrain(this.wrapper, this.manager, this.random, 20, 4);
     }
 
     public start() {}
