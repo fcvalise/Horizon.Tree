@@ -11,12 +11,12 @@ export class TreeDescription {
     }
 
     private describeTree(s: TreeSettings, variant = 0): string {
-        const { growth, render, leaf, tropism, architecture } = s;
+        const { branch, render, leaf, tropism, architecture } = s;
 
         // Metrics
-        const height = this.estimateHeight(growth.segmentLength, growth.segmentLengthDecay, growth.maxDepth);
-        const branchiness = growth.branchChance;
-        const taper = render.topWidth / (render.bottomWidth + 1e-6);
+        const height = this.estimateHeight(branch.length, branch.lengthDecay, s.maxDepth);
+        const branchiness = branch.chance;
+        const taper = branch.topWidth / (branch.bottomWidth + 1e-6);
 
         // Buckets → adjectives
         const size = this.bucket(
@@ -35,7 +35,7 @@ export class TreeDescription {
             ["sparse in branches", "timid offshoots", "branching generously", "flourishing with countless arms", "wildly tangled"] as const
         );
         const leaves = this.bucket(
-            render.leafScale,
+            leaf.scale,
             [0.3, 0.7, 1.5, 2.5],
             ["almost bare", "lightly adorned in green", "clothed in foliage", "wrapped in abundant greenery", "overflowing with lush canopies"] as const
         );
@@ -118,7 +118,7 @@ export class TreeDescription {
 
         // Bonus: angle character from branchAngle (gentle vs bold) & jitter “mood”
         const angleMood = this.bucket(
-            growth.branchAngle,
+            branch.angle,
             [15, 30, 45, 70],
             ["hugging the trunk", "peeling away gently", "reaching out boldly", "splaying wide into space", "flinging itself outward"] as const
         );

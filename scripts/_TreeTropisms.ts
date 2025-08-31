@@ -1,17 +1,17 @@
 import * as hz from "horizon/core";
 import { Bud } from "_TreeGrowth";
 import { TMath } from "_TreeMath";
-import { TreeRaycast } from "_TreeRaycast";
 import { TropismSettings } from "_TreeSettings";
-import { RNG } from "_RNG";
 import { TreeArchitecture } from "_TreeArchitecture";
+import { ORandom } from "_ORandom";
+import { ORaycast } from "_ORaycast";
 
 export class TreeTropisms {
     constructor(
         private architecture: TreeArchitecture,
         private settings: TropismSettings,
-        private raycast: TreeRaycast,
-        private rng: RNG
+        private raycast: ORaycast,
+        private random: ORandom
     ) { }
 
     public sunDir(): hz.Vec3 { return new hz.Vec3(0, 1, 0); }
@@ -34,10 +34,10 @@ export class TreeTropisms {
         const raycastDistance = 10;
 
         for (let i = 0; i < rayCount; i++) {
-            const randomDir = TMath.vScale(this.rng.vector(), 0.5 + i / rayCount);
+            const randomDir = TMath.vScale(this.random.vector(), 0.5 + i / rayCount);
             const sunDir = this.sunDir();
             const sampleDir = TMath.vNorm(TMath.vAdd(sunDir, randomDir));
-            const hit = this.raycast.cast(bud.pos, sampleDir, raycastDistance);
+            const hit = this.raycast.cast(bud.position, sampleDir, raycastDistance);
             
             if (!hit) {
                 maxDistance = raycastDistance;
@@ -60,10 +60,10 @@ export class TreeTropisms {
     }
 
     private computeApical(bud: Bud): hz.Vec3 {
-        return TMath.vScale(bud.dir, this.settings.apicalWeight);
+        return TMath.vScale(bud.direction, this.settings.apicalWeight);
     }
 
     private computeJitter(): hz.Vec3 {
-        return TMath.vScale(this.rng.vector(), this.settings.jitterStrength);
+        return TMath.vScale(this.random.vector(), this.settings.jitterStrength);
     }
 }

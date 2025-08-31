@@ -1,18 +1,16 @@
-import { RNG } from "_RNG";
-import { Bud, TreeGrowth } from "_TreeGrowth";
+import { ORandom } from "_ORandom";
+import { OWrapper } from "_OWrapper";
+import { Bud } from "_TreeGrowth";
 import { TMath } from "_TreeMath";
-import { TreePool } from "_TreePool";
 import { LeafSettings, RenderSettings } from "_TreeSettings";
-import { TreeTween } from "_TreeTween";
 import * as hz from "horizon/core";
-import { UpdateUIBar } from "UIBarController";
 
 export class TreeLeaves {
     constructor(
-        private component: hz.Component,
+        private wrapper: OWrapper,
         private renderSettings: RenderSettings,
         private settings: LeafSettings,
-        private rng: RNG
+        private random: ORandom
     ) {
     }
 
@@ -22,29 +20,23 @@ export class TreeLeaves {
         const rightX = TMath.vNorm(TMath.vCross(fwd, radial));
         const upY = TMath.vNorm(TMath.vCross(radial, rightX));
         const rot = TMath.basisToQuat(radial, upY);
-        const s = this.renderSettings.leafScale;
+        const s = this.settings.scale;
         const scale = new hz.Vec3(s, s, s);
 
         const id = this.renderSettings.leafAssetId!;
-        const entity = await TreePool.I.acquire(id, basePos, rot, scale);
-        // let entityPromise = await this.component.world.spawnAsset(new hz.Asset(BigInt(id)), basePos, rot, scale);
-        // let entity = entityPromise[0];
-        // this.component.sendNetworkBroadcastEvent(UpdateUIBar, {
-        //     id: 'StaticValue',
-        //     percent: 0,
-        //     current: TreeGrowth.count++,
-        //     total: TreeGrowth.count++
-        // });
+        // const entity = await TreePool.I.acquire(id, basePos, rot, scale);
+        let entityPromise = await this.wrapper.world.spawnAsset(new hz.Asset(BigInt(id)), basePos, rot, scale);
+        let entity = entityPromise[0];
 
         if (entity) {
             entity.as(hz.MeshEntity).style.tintColor.set(new hz.Color(0.8, 0.94, 0.1));
-            bud.entityList?.push(entity);
+            // bud.oEntityList?.push(entity);
         }
     };
 
     public async placeLeaves(bud: Bud, forward: hz.Vec3, segLen: number): Promise<void> {
         if (!this.renderSettings.leafAssetId) return;
-        const vcount = Math.max(1, this.settings.virtualNodesPerSegment);
+        const vcount = Math.max(1, this.settings.count);
         const fwd = TMath.vNorm(forward);
 
         let side = TMath.vCross(new hz.Vec3(0, 1, 0), fwd);
@@ -56,8 +48,8 @@ export class TreeLeaves {
         for (let v = 0; v < vcount; v++) {
             const frac = (v + 1) / (vcount + 1);
             const jitterDefault = this.settings.axialJitter
-            const jitter = jitterDefault !== 0 ? this.rng.range(-jitterDefault, jitterDefault) : 0;
-            const nodeOrigin = TMath.vAdd(bud.pos, TMath.vScale(fwd, segLen * TMath.clamp01(frac + jitter)));
+            const jitter = jitterDefault !== 0 ? this.random.range(-jitterDefault, jitterDefault) : 0;
+            const nodeOrigin = TMath.vAdd(bud.position, TMath.vScale(fwd, segLen * TMath.clamp01(frac + jitter)));
             const subIndex = bud.nodeIndex * vcount + v;
 
             switch (ph) {

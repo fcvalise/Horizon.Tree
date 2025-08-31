@@ -1,11 +1,12 @@
-export type GrowthSettings = {
-    maxDepth: number;
-    segmentLength: number;
-    segmentLengthDecay: number;
-    initialBudCount: number;
-    branchChance: number;
-    branchAngle: number;
-    branchRollMax: number;
+export type BranchSettings = {
+    initialCount: number;
+    length: number;
+    lengthDecay: number;
+    bottomWidth: number;
+    topWidth: number;
+    chance: number;
+    angle: number;
+    rollMax: number;
     growAfterPrune: boolean;
 };
 export type TropismSettings = {
@@ -19,12 +20,10 @@ export type TropismSettings = {
 export type RenderSettings = {
     segmentAssetId: number;
     leafAssetId?: number;
-    bottomWidth: number;
-    topWidth: number;
-    leafScale: number;
 };
 export type LeafSettings = {
-    virtualNodesPerSegment: number;
+    scale: number;
+    count: number;
     petioleLength: number;
     axialJitter: number;
     spiralDivergence: number;
@@ -42,7 +41,8 @@ export type ArchitectureSettings = {
 };
 export type TreeSettings = {
     seed: string;
-    growth: GrowthSettings;
+    maxDepth: number;
+    branch: BranchSettings;
     tropism: TropismSettings;
     render: RenderSettings;
     leaf: LeafSettings;

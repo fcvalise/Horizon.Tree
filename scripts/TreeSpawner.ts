@@ -1,34 +1,30 @@
-import { OisifManager } from '_OManager';
+import * as hz from 'horizon/core';
+import { ORaycast } from '_ORaycast';
+import { OWrapper } from '_OWrapper';
 import { TreeBase } from '_TreeBase';
 import { TreeEvent } from '_TreeEvent';
-import { TMath } from '_TreeMath';
 import { TreePool } from '_TreePool';
-import { TreeRaycast } from '_TreeRaycast';
-import * as hz from 'horizon/core';
 
 export class TreeSpawner extends hz.Component<typeof TreeSpawner> {
   private tree!: TreeBase;
   private particle!: hz.ParticleGizmo;
-  
+  private wrapper!: OWrapper;
+  private raycast!: ORaycast;
 
   start() {
+    this.wrapper = new OWrapper(this);
+    this.raycast = new ORaycast(this.wrapper);
     this.connectNetworkBroadcastEvent(TreeEvent.spawnTree, (payload) => {
       this.spawnObjectAtPlayer(payload.player, payload.position);
     })
     this.particle = this.world.getEntitiesWithTags(['SpawnParticle'])[0].as(hz.ParticleGizmo);
-
-    this.connectNetworkBroadcastEvent(TreeEvent.localRacastDebug, (payload) => {
-      const rot = hz.Quaternion.lookRotation(payload.direction);
-      this.world.spawnAsset(new hz.Asset(BigInt(1305910664434839)), payload.position, rot);
-      console.log(`Create debug ray`);
-    })
   }
 
   private async spawnObjectAtPlayer(player: hz.Player, position: hz.Vec3) {
       // this.particle.position.set(position);
       // this.particle.play({ fromStart: true});
       // this.entity.position.set(position);
-      // this.tree = new TreeBase(this, position, { seed: `${position.x * 21839}` });
+      this.tree = new TreeBase(this.wrapper, position, { seed: `${position.x * 21839}` });
       // player.applyForce(TMath.vScale(player.forward.get(), -2.5));
       player.showToastMessage("Tree planted", 2000);
   }

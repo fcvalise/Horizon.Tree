@@ -1,11 +1,12 @@
 import * as hz from "horizon/core";
-import { TMath } from "_TreeMath";
+import "./_OMath";
 import { OUtils } from "_OUtils";
 import { OEntity } from "_OEntity";
 import { OWrapper } from "_OWrapper";
 import { ORandom } from "_ORandom";
 import { OEntityManager } from "_OEntityManager";
 import { UpdateUIBar } from "UIBarController";
+import { TreeBase } from "_TreeBase";
 
 class Cell {
     public oEntity: OEntity | undefined;
@@ -45,7 +46,12 @@ export class OTerrain {
                 cell.oEntity.rotation = cell.rotation;
                 if (cell.oEntity.makeDynamic()) {
                     cell.discovered = true;
-                    cell.oEntity.scaleZeroTo(cell.scale, 0.8);
+                    cell.oEntity.scaleZeroTo(cell.scale, 0.8)
+                    .then(() => {
+                        if (this.random.bool(0.3)) {
+                            new TreeBase(this.wrapper, cell.position);
+                        }
+                    });
                 }
             }
         }
@@ -78,7 +84,8 @@ export class OTerrain {
             const position = new hz.Vec3(posX, posY, posZ).add(startPos);
             //rotation
             const lookAtDir = hz.Vec3.down.mul(10).add(this.random.vectorHalf());
-            const twist = TMath.rotateAroundAxis(lookAtDir, lookAtDir, this.random.range(0, 360));
+            // const twist = TMath.rotateAroundAxis(lookAtDir, lookAtDir, this.random.range(0, 360));
+            const twist = lookAtDir.rotateArround(this.random.range(0, 360), lookAtDir);
             const rotation = hz.Quaternion.lookRotation(twist);
             // scale
             const scaleXZRandom = this.random.next() * 0.5;

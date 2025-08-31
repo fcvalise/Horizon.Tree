@@ -1,19 +1,19 @@
 import * as hz from "horizon/core";
-import { TreeRaycast } from "_TreeRaycast";
-import { TreeSettings } from "_TreeSettings";
-import { TMath } from "_TreeMath";
+import "./_OMath";
+import { BranchSettings, TreeSettings } from "_TreeSettings";
 import { TreeArchitecture } from "_TreeArchitecture";
-import { RNG } from "_RNG";
 import { TreeTropisms } from "_TreeTropisms";
 import { TreeLeaves } from "_TreeLeaves";
-import { TreePool } from "_TreePool";
 import { TreeEvent } from "_TreeEvent";
-import { TreeTween } from "_TreeTween";
-import { UpdateUIBar } from "UIBarController";
+import { OisifManager } from "_OManager";
+import { OEntity } from "_OEntity";
+import { ORandom } from "_ORandom";
+import { ORaycast } from "_ORaycast";
+import { OWrapper } from "_OWrapper";
 
 export type Bud = {
-    pos: hz.Vec3;
-    dir: hz.Vec3;
+    position: hz.Vec3;
+    direction: hz.Vec3;
     depth: number;
     isBranchStart: boolean;
     axisId: number;
@@ -23,7 +23,8 @@ export type Bud = {
     length: number;
     parent?: Bud;
     children: Bud[];
-    entityList: hz.Entity[];
+    oEntity?: OEntity,
+    oEntityList: OEntity[];
     created?: boolean;
     isPruned?: boolean;
 };
@@ -31,59 +32,61 @@ export type Bud = {
 export const treeTag = "Tree";
 
 export class TreeGrowth {
-    private rng!: RNG;
-    private frameCount: number = 0;
+    private random!: ORandom;
+    private raycast: ORaycast
     private growthQueue: Bud[] = [];
+    private frameCount: number = 0;
     private nextAxisId = 1;
 
+    private settings!: BranchSettings;
     private architecture!: TreeArchitecture;
     private tropisms!: TreeTropisms;
     private leaves!: TreeLeaves;
 
-    private budMap: Map<hz.Entity, Bud> = new Map();
+    private budMap: Map<OEntity, Bud> = new Map();
     private budRoot!: Bud;
     private isStopped: boolean = false;
 
     public static count = 0;
 
-
     constructor(
         private position: hz.Vec3,
-        private component: hz.Component,
-        private settings: TreeSettings,
-        private raycast: TreeRaycast
+        private wrapper: OWrapper,
+        private treeSettings: TreeSettings,
     ) {
-        this.rng = new RNG(settings.seed);
-        this.architecture = new TreeArchitecture(settings.architecture, settings.growth);
-        this.tropisms = new TreeTropisms(this.architecture, settings.tropism, raycast, this.rng);
-        this.leaves = new TreeLeaves(component, settings.render, settings.leaf, this.rng);
+        this.random = new ORandom(treeSettings.seed);
+        this.raycast = new ORaycast(this.wrapper);
+        this.architecture = new TreeArchitecture(treeSettings, treeSettings.architecture);
+        this.tropisms = new TreeTropisms(this.architecture, treeSettings.tropism, this.raycast, this.random);
+        this.leaves = new TreeLeaves(this.wrapper, treeSettings.render, treeSettings.leaf, this.random);
+        this.settings = treeSettings.branch;
 
         this.createRoot();
 
-        this.component.connectNetworkBroadcastEvent(TreeEvent.pruneTree, (payload) => {
+        this.wrapper.component.connectNetworkBroadcastEvent(TreeEvent.pruneTree, (payload) => {
             this.prune(payload.entity);
         });
     }
 
     public createRoot() {
         this.growthQueue = [];
-        for (let i = 0; i < this.settings.growth.initialBudCount; i++) {
+        for (let i = 0; i < this.settings.initialCount; i++) {
             const baseUp = hz.Vec3.up;
             const rootPos = this.position;
-            const dir = hz.Vec3.normalize(baseUp);
+            const direction = hz.Vec3.normalize(baseUp);
             const newBud = {
-                pos: rootPos,
-                dir: dir,
+                position: rootPos,
+                direction: direction,
                 depth: 0,
                 isBranchStart: false,
                 axisId: this.nextAxisId++,
                 nodeIndex: 0,
                 isBranchAxis: false,
                 axisOrder: 0,
-                length: this.settings.growth.segmentLength,
+                length: this.settings.length,
                 parent: undefined,
                 children: [],
-                entityList: [],
+                oEntityList: [],
             }
 
             this.growthQueue.push(newBud);
@@ -97,8 +100,8 @@ export class TreeGrowth {
         if (this.growthQueue.length === 0) return;
         if (this.architecture.waitForRythmic(this.frameCount)) return;
         const bud = this.growthQueue.shift()!;
-        if (bud.depth >= this.settings.growth.maxDepth) return;
-        let combined = this.tropisms.getVector(bud);
+        if (bud.depth >= this.treeSettings.maxDepth) return;
+        const combined = this.tropisms.getVector(bud);
         this.createSegment(bud, combined);
     }
 
@@ -110,38 +113,38 @@ export class TreeGrowth {
     public async stopBranch(budRoot: Bud) {
         for (const bud of budRoot.children) {
             bud.isPruned = true;
-            await TreeTween.waitFor(this.component, () => Boolean(bud.created));
-            for (const entity of budRoot.entityList) {
-                await TreePool.I.release(entity);
-            }
+            // await TreeTween.waitFor(this.component, () => Boolean(bud.created));
+            // for (const entity of budRoot.oEntityList) {
+            //     // await TreePool.I.release(entity);
+            // }
         }
         // TreePool.I.resetAll();
     }
 
     public prune(entity: hz.Entity) {
-        const budRoot = this.budMap.get(entity);
-        if (budRoot) {
-            console.log(JSON.stringify(this.settings));
-            this.removeBranch(budRoot);
-            if (this.settings.growth.growAfterPrune) {
-                budRoot.children = [];
-                budRoot.entityList = [];
-                budRoot.isPruned = false;
-                this.growthQueue.push(budRoot);
-            }
-        }
+        // const budRoot = this.budMap.get(entity);
+        // if (budRoot) {
+        //     console.log(JSON.stringify(this.settings));
+        //     this.removeBranch(budRoot);
+        //     if (this.settings.growth.growAfterPrune) {
+        //         budRoot.children = [];
+        //         budRoot.oEntityList = [];
+        //         budRoot.isPruned = false;
+        //         this.growthQueue.push(budRoot);
+        //     }
+        // }
     }
 
     private async removeBranch(bud: Bud) {
         bud.isPruned = true;
-        await TreeTween.waitFor(this.component, () => Boolean(bud.created));
-        for (const entity of bud.entityList) {
-            TreePool.I.release(entity);
-        }
-        bud.entityList = [];
-        for (const child of bud.children) {
-            this.removeBranch(child);
-        }
+        // await TreeTween.waitFor(this.component, () => Boolean(bud.created));
+        // for (const entity of bud.oEntityList) {
+        //     // TreePool.I.release(entity);
+        // }
+        // bud.oEntityList = [];
+        // for (const child of bud.children) {
+        //     this.removeBranch(child);
+        // }
     }
     
     private isPrunedParent(budRoot: Bud) {
@@ -155,51 +158,46 @@ export class TreeGrowth {
         return false;
     }
 
-    private async createSegment(bud: Bud, dir: hz.Vec3): Promise<void> {
+    private async createSegment(bud: Bud, direction: hz.Vec3): Promise<void> {
         if (this.isPrunedParent(bud)) return;
-        if (this.raycast.cast(bud.pos, this.tropisms.sunDir(), bud.length * 4)) {
+        if (this.raycast.cast(bud.position, this.tropisms.sunDir(), bud.length * 4)) {
             bud.length *= 0.8;
         }
-        if (bud.length < this.settings.growth.segmentLength * 0.2) return;
-        const pos = bud.pos;
-        const newPos = TMath.vAdd(bud.pos, TMath.vScale(dir, bud.length));
-        const fwd = hz.Vec3.normalize(TMath.vSub(newPos, bud.pos));
-        const rot = TMath.lookRotation(fwd, new hz.Vec3(0, 1, 0));
-        const t = bud.depth / Math.max(1, this.settings.growth.maxDepth);
-        let width = TMath.lerp(this.settings.render.bottomWidth, this.settings.render.topWidth, t);
-        width *= bud.length / this.settings.growth.segmentLength;
-        const scale = new hz.Vec3(width, width, bud.length);
-
-        const id = this.settings.render.segmentAssetId;
-        let entity = await TreePool.I.acquire(id, pos, rot, scale);
+        if (bud.length < this.settings.length * 0.2) return;
         
-        // let entityPromise = await this.component.world.spawnAsset(new hz.Asset(BigInt(id)), pos, rot, scale);
-        // let entity = entityPromise[0];
-        // this.component.sendNetworkBroadcastEvent(UpdateUIBar, {
-        //     id: 'StaticValue',
-        //     percent: 0,
-        //     current: TreeGrowth.count++,
-        //     total: TreeGrowth.count++
-        // });
-        
-        if (entity) {
-            entity.as(hz.MeshEntity).style.tintColor.set(new hz.Color(0.01, 0.01, 0.01));
-            await TreeTween.waitFor(this.component, () => TreePool.I.isScaled(entity!));
-            bud.entityList.push(entity);
-            this.budMap.set(entity, bud);
-    
-            if (bud.depth / this.settings.growth.maxDepth > 0.4) {// && bud.length > this.settings.growth.segmentLength * 0.4) {
-                await this.leaves.placeLeaves(bud, dir, bud.length);
+        if (OisifManager.I.pool.count() > 0) {
+            if (!bud.oEntity) {
+                bud.oEntity = OisifManager.I.manager.create();
             }
-            bud.created = true;
-            this.enqueueSegment(bud, dir, newPos);
+            if (bud.oEntity && bud.oEntity.makeDynamic()) {
+                const nextPosition = bud.position.add(direction.mul(bud.length));
+                const forward = nextPosition.sub(bud.position).normalize();
+                const t = bud.depth / Math.max(1, this.treeSettings.maxDepth);
+                const width = Number.lerp(this.settings.bottomWidth, this.settings.topWidth, t) * (bud.length / this.settings.length);
+
+                bud.oEntity.position = bud.position;
+                bud.oEntity.rotation = hz.Quaternion.lookRotation(forward);
+                bud.oEntity.scale = new hz.Vec3(width, width, bud.length);
+                bud.oEntity.color = new hz.Color(0.01, 0.01, 0.01);
+                bud.oEntityList.push(bud.oEntity);
+                this.budMap.set(bud.oEntity, bud);
+                bud.oEntity.scaleZeroTo(bud.oEntity.scale, this.random.range(1, 4))
+                .then(() => {
+                    this.enqueueSegment(bud, direction, nextPosition);
+                })
+                // .then(() => {
+                //     if (bud.depth / this.settings.growth.maxDepth > 0.4) {// && bud.length > this.settings.growth.segmentLength * 0.4) {
+                //         // await this.leaves.placeLeaves(bud, dir, bud.length);
+                //     }
+                // });
+            }
         } else {
             this.growthQueue.push(bud);
         }
     }
 
     private enqueueSegment(bud: Bud, combined: hz.Vec3, newPos: hz.Vec3) {
-        if (bud.depth + 1 >= this.settings.growth.maxDepth) return;
+        if (bud.depth + 1 >= this.treeSettings.maxDepth) return;
         const isNewBranch = this.architecture.isNewBranch(bud);
         const isSympodialStop = this.architecture.isSympodialStop(bud, isNewBranch);
 
@@ -214,51 +212,49 @@ export class TreeGrowth {
         }
     }
 
-    private continueSegment(bud: Bud, newPos: hz.Vec3, dir: hz.Vec3): Bud {
+    private continueSegment(bud: Bud, newPosition: hz.Vec3, direction: hz.Vec3): Bud {
         const newBud = {
-            pos: newPos,
-            dir: dir,
+            position: newPosition,
+            direction: direction,
             depth: bud.depth + 1,
             isBranchStart: false,
             axisId: bud.axisId,
             nodeIndex: bud.nodeIndex + 1,
             isBranchAxis: bud.isBranchAxis,
             axisOrder: bud.axisOrder,
-            length: bud.length * this.settings.growth.segmentLengthDecay,
+            length: bud.length * this.settings.lengthDecay,
             parent: bud,
             children: [],
-            entityList: []
+            oEntityList: []
         }
         this.growthQueue.push(newBud);
         return newBud;
     }
 
-    private createNewSegment(bud: Bud, combined: hz.Vec3, newPos: hz.Vec3): Bud {
-        let axis = TMath.vCross(combined, new hz.Vec3(0, 1, 0));
-        if (TMath.vLen2(axis) < 1e-6) axis = TMath.vCross(combined, new hz.Vec3(1, 0, 0));
-        axis = hz.Vec3.normalize(axis);
+    private createNewSegment(bud: Bud, combined: hz.Vec3, newPosition: hz.Vec3): Bud {
+        let axis = hz.Vec3.cross(combined, new hz.Vec3(0, 1, 0))
+        if (axis.length2() < 1e-6) axis = hz.Vec3.cross(combined, new hz.Vec3(1, 0, 0));
+        axis = axis.normalize();
 
-        const roll = this.settings.growth.branchRollMax;
-        const branchAngle = this.settings.growth.branchAngle;
-        const rollAngle = this.rng.range(-roll, roll)
-        let split = TMath.rotateAroundAxis(combined, axis, branchAngle);
-        split = TMath.rotateAroundAxis(split, combined, rollAngle);
-        split = hz.Vec3.normalize(split);
+        const roll = this.settings.rollMax;
+        const branchAngle = this.settings.angle;
+        const rollAngle = this.random.range(-roll, roll)
+        const splitDirection = combined.rotateArround(branchAngle, axis).rotateArround(rollAngle, axis).normalize();
 
         const newAxisId = this.nextAxisId++;
         const newBud = {
-            pos: newPos,
-            dir: split,
+            position: newPosition,
+            direction: splitDirection,
             depth: bud.depth + 1,
             isBranchStart: true,
             axisId: newAxisId,
             nodeIndex: 0,
             isBranchAxis: true,
             axisOrder: bud.axisOrder + 1,
-            length: bud.length * this.settings.growth.segmentLengthDecay,
+            length: bud.length * this.settings.lengthDecay,
             parent: bud,
             children: [],
-            entityList: []
+            oEntityList: []
         }
         this.growthQueue.push(newBud);
         return newBud;

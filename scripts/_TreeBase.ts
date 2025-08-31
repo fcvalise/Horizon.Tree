@@ -1,23 +1,22 @@
 import * as hz from "horizon/core";
-import { mergeSettings, TreeSettings } from "_TreeSettings";
-import { TreeRaycast } from "_TreeRaycast";
-import { TreeGrowth } from "_TreeGrowth";
 import { Library } from "_Library";
 import { RNG } from "_RNG";
-import { TreeEvent } from "_TreeEvent";
-import { TreeDescription } from "_TreeDescription";
-import { StringHelper } from "_StringHelper";
+import { OWrapper } from "_OWrapper";
+import { mergeSettings, TreeSettings } from "_TreeSettings";
+import { TreeGrowth } from "_TreeGrowth";
 
 const DefaultSettings: TreeSettings = {
     seed: 'MyTree',
-    growth: {
-        maxDepth: 8,
-        segmentLength: 0.9,
-        segmentLengthDecay: 0.98,
-        initialBudCount: 1,
-        branchChance: 0.4,
-        branchAngle: 40,
-        branchRollMax: 15,
+    maxDepth: 5,
+    branch: {
+        initialCount: 1,
+        length: 1.9,
+        lengthDecay: 0.98,
+        bottomWidth: 0.4,
+        topWidth: 0.05,
+        chance: 0.4,
+        angle: 40,
+        rollMax: 15,
         growAfterPrune: false
     },
     tropism: {
@@ -31,12 +30,10 @@ const DefaultSettings: TreeSettings = {
     render: {
         segmentAssetId: Library.matter,
         leafAssetId: Library.matter,
-        bottomWidth: 0.2,
-        topWidth: 0.01,
-        leafScale: 0.8
     },
     leaf: {
-        virtualNodesPerSegment: 2,
+        scale: 0.8,
+        count: 2,
         petioleLength: 0.1,
         axialJitter: 0.08,
         spiralDivergence: 137.5,
@@ -54,57 +51,56 @@ const DefaultSettings: TreeSettings = {
     },
 };
 
-  const pick = <T>(arr: readonly T[]): T =>
-    arr[Math.floor(RNG.get().range(0, arr.length))];
+const pick = <T>(arr: readonly T[]): T =>
+arr[Math.floor(RNG.get().range(0, arr.length))];
 
 export class TreeBase {
-    private component!: hz.Component;
     public settings: TreeSettings = DefaultSettings;
-    private raycast!: TreeRaycast;
+    public isGrowing: boolean = true;
     private growth!: TreeGrowth;
 
-    private updateSubscription: hz.EventSubscription | null = null;
+    constructor(
+        private wrapper: OWrapper,
+        position: hz.Vec3,
+        overrides?: Partial<TreeSettings>
+    ) {
+        // this.settings = mergeSettings(DefaultSettings, this.getRandomSettings(position));
+        this.growth = new TreeGrowth(position, wrapper, this.settings);
+        this.wrapper.onUpdateUntil(() => this.growth.step(), () => !this.isGrowing);
 
-    constructor(component: hz.Component, position: hz.Vec3, overrides?: Partial<TreeSettings>) {
-        this.component = component;
-        this.settings = mergeSettings(DefaultSettings, this.getRandomSettings(position));
-        this.raycast = new TreeRaycast(this.component.entity, this.component);
-        this.growth = new TreeGrowth(position, this.component, this.settings, this.raycast);
 
-        this.updateSubscription = this.component.connectLocalBroadcastEvent(hz.World.onUpdate, () => {
-            this.growth.step();
-        });
-
-        this.component.connectNetworkBroadcastEvent(TreeEvent.spawnTreeDescription, (payload) => {
-            this.createTreeDescription(payload.position);
-        });
-        this.createTreeDescription(position.add(hz.Vec3.up.add(hz.Vec3.forward)));
+        // this.component.connectNetworkBroadcastEvent(TreeEvent.spawnTreeDescription, (payload) => {
+        //     this.createTreeDescription(payload.position);
+        // });
+        // this.createTreeDescription(position.add(hz.Vec3.up.add(hz.Vec3.forward)));
     }
 
-    createTreeDescription(position: hz.Vec3) {
-        const asset = new hz.Asset(BigInt(Library.treeDescription));
-        const scale = new hz.Vec3(1, 1, 0.2);
-        this.component.world.spawnAsset(asset, position, hz.Quaternion.zero, scale)
-        .then((entityArray) => {
-            const treeDescription = new TreeDescription(this.settings);
-            const description = StringHelper.formatParagraph(treeDescription.description, 100);
-            console.log(description);
+    // createTreeDescription(position: hz.Vec3) {
+    //     const asset = new hz.Asset(BigInt(Library.treeDescription));
+    //     const scale = new hz.Vec3(1, 1, 0.2);
+    //     this.component.world.spawnAsset(asset, position, hz.Quaternion.zero, scale)
+    //     .then((entityArray) => {
+    //         const treeDescription = new TreeDescription(this.settings);
+    //         const description = StringHelper.formatParagraph(treeDescription.description, 100);
+    //         console.log(description);
             
-            entityArray[0].children.get()[0].as(hz.TextGizmo).text.set(description);
-        });
-    }
+    //         entityArray[0].children.get()[0].as(hz.TextGizmo).text.set(description);
+    //     });
+    // }
 
     getRandomSettings(position: hz.Vec3) {
         return {
             seed: `${position.z * position.x * position.y * 127326542734}`,
-            growth: {
-                maxDepth: 7,
-                segmentLength: RNG.get().range(0.4, 2),
-                segmentLengthDecay: RNG.get().range(0.5, 0.9),
-                initialBudCount: RNG.get().range(1, 4),
-                branchChance: RNG.get().range(0, 0.9),
-                branchAngle: RNG.get().range(10, 90),
-                branchRollMax: 15,
+            maxDepth: 7,
+            branch: {
+                initialCount: RNG.get().range(1, 4),
+                length: RNG.get().range(0.4, 2),
+                lengthDecay: RNG.get().range(0.5, 0.9),
+                bottomWidth: RNG.get().range(0.1, 0.25),
+                topWidth: RNG.get().range(0.001, 0.1),
+                chance: RNG.get().range(0, 0.9),
+                angle: RNG.get().range(10, 90),
+                rollMax: 15,
                 growAfterPrune: false
             },
             tropism: {
@@ -118,8 +114,6 @@ export class TreeBase {
             render: {
                 segmentAssetId: Library.matter,
                 leafAssetId: Library.matter,
-                bottomWidth: RNG.get().range(0.1, 0.25),
-                topWidth: RNG.get().range(0.001, 0.1),
                 leafScale: RNG.get().range(0.3, 1.2)
             },
             architecture: {

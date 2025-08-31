@@ -2,6 +2,7 @@ import * as hz from "horizon/core";
 import { Library } from "_Library";
 import { UpdateUIBar } from "UIBarController";
 import { OWrapper } from "_OWrapper";
+import { OUtils } from "_OUtils";
 // import { OEntity } from "_OEntity";
 
 export class OPoolEntity {
@@ -18,11 +19,11 @@ export class OPoolManager {
     private availableCount: number = 0;
 
     constructor(private wrapper: OWrapper) {
-        this.createAsset();
-        this.createAsset();
-        this.createAsset();
-        this.createAsset();
-        // this.getReserve();
+        // this.createAsset();
+        // this.createAsset();
+        // this.createAsset();
+        // this.createAsset();
+        this.getReserve();
     }
 
     public count() {
@@ -41,13 +42,14 @@ export class OPoolManager {
         return undefined;
     }
 
-    private getReserve() {
+    private async getReserve() {
         const reserve = this.wrapper.world.getEntitiesWithTags(['PoolReserve'])[0];
         const children = reserve.children.get();
         for (const child of children) {
             const pEntity = new OPoolEntity(child);
             child.interactionMode.set(hz.EntityInteractionMode.Physics);
             child.simulated.set(false);
+            await OUtils.waitFor(this.wrapper, () => !child.simulated.get());
             pEntity.isUse = false;
             this.pool.push(pEntity);
             this.availableCount++;

@@ -1,12 +1,12 @@
 import * as hz from "horizon/core";
-import { ArchitectureSettings, GrowthSettings } from "_TreeSettings";
+import { ArchitectureSettings, BranchSettings, TreeSettings,  } from "_TreeSettings";
 import { TMath } from "_TreeMath";
 import { Bud } from "_TreeGrowth";
 
 export class TreeArchitecture {
     constructor(
+        private treeSettings: TreeSettings,
         private settings: ArchitectureSettings,
-        private growthSettings: GrowthSettings
     ) { }
 
     public waitForRythmic(frameCount: number): boolean {
@@ -38,8 +38,8 @@ export class TreeArchitecture {
     public isNewBranch(bud: Bud): boolean {
         const phaseOK = this.settings.branchingPhase === "Sylleptic" || bud.depth > 0;
         if (!phaseOK) return false;
-        if (bud.depth + 1 >= this.growthSettings.maxDepth) return false;
-        return Math.random() < this.growthSettings.branchChance;
+        if (bud.depth + 1 >= this.treeSettings.maxDepth) return false;
+        return Math.random() < this.treeSettings.branch.chance;
     }
 
     public isSympodialStop(bud: Bud, willBranch: boolean): boolean {

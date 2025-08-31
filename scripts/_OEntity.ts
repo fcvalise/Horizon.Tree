@@ -72,7 +72,8 @@ export class OEntity {
         if (!this.staticProxy && this.isReady && this.entity) {
             this.isReady = false;
             const asset = new hz.Asset(BigInt(Library.matterStatic));
-            this.wrapper.world.spawnAsset(asset, this.oPosition.add(hz.Vec3.up.mul(0.01)), this.oRotation, this.oScale.mul(1.02))
+            const position = this.oPosition.add(this.oRotation.forward.mul(-0.01))
+            this.wrapper.world.spawnAsset(asset, position, this.oRotation, this.oScale.mul(1.02))
             .then((promise) => {
                 this.staticProxy = promise[0];
                 this.pool.staticCount++;

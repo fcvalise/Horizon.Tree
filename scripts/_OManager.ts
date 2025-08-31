@@ -2,8 +2,8 @@ import * as hz from "horizon/core";
 import { ORandom } from "_ORandom";
 import { OWrapper } from "_OWrapper";
 import { OPoolManager } from "_OPool";
-import { OClouds } from "_OClouds";
 import { OEntityManager } from "_OEntityManager";
+import { OClouds } from "_OClouds";
 import { OTerrain } from "_OTerrain";
 
 export class OisifManager extends hz.Component<typeof OisifManager> {
