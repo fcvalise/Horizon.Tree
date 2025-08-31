@@ -1,30 +1,17 @@
-import { Component, PropTypes, World, Player, SpawnPointGizmo } from 'horizon/core';
+import * as hz from 'horizon/core';
 
-export class FallRespawn extends Component<typeof FallRespawn> {
+export class FallRespawn extends hz.Component<typeof FallRespawn> {
   static propsDefinition = {
-    // The spawn point where players will be respawned.
-    spawnPoint: { type: PropTypes.Entity },
-    // The Y position below which a player will be respawned.
-    fallThreshold: { type: PropTypes.Number, default: -2 },
+    spawnPoint: { type: hz.PropTypes.Entity },
+    fallThreshold: { type: hz.PropTypes.Number, default: -2 },
   };
 
-  private spawnPointGizmo?: SpawnPointGizmo;
+  private spawnPointGizmo?: hz.SpawnPointGizmo;
+  private playerMap: Map<hz.Player, hz.Vec3> = new Map()
 
   override start() {
-    if (!this.props.spawnPoint) {
-      console.error("FallRespawn: The 'spawnPoint' property is not set. Please assign a SpawnPointGizmo in the editor.");
-      return;
-    }
-
-    this.spawnPointGizmo = this.props.spawnPoint.as(SpawnPointGizmo);
-
-    if (!this.spawnPointGizmo) {
-      console.error("FallRespawn: The assigned 'spawnPoint' entity is not a SpawnPointGizmo.");
-      return;
-    }
-
-    // Connect to the world's update loop to check player positions every frame.
-    this.connectLocalBroadcastEvent(World.onUpdate, () => {
+    this.spawnPointGizmo = this.props.spawnPoint!.as(hz.SpawnPointGizmo);
+    this.connectLocalBroadcastEvent(hz.World.onUpdate, () => {
       this.checkAllPlayers();
     });
   }
@@ -36,20 +23,19 @@ export class FallRespawn extends Component<typeof FallRespawn> {
     }
   }
 
-  private checkPlayerPosition(player: Player) {
+  private checkPlayerPosition(player: hz.Player) {
     const playerPosition = player.position.get();
-
+    const lastPosition = this.playerMap.get(player)!;
     if (playerPosition.y < this.props.fallThreshold) {
-      this.respawnPlayer(player);
+      this.spawnPointGizmo?.position.set(lastPosition.add(hz.Vec3.up.mul(3)));
+      this.spawnPointGizmo?.teleportPlayer(player);
     }
-  }
-
-  private respawnPlayer(player: Player) {
-    if (this.spawnPointGizmo) {
-      this.spawnPointGizmo.teleportPlayer(player);
-      console.log(`Player ${player.name.get()} fell and was respawned.`);
+    if (player.isGrounded) {
+      this.async.setTimeout(() => {
+        this.playerMap.set(player, playerPosition);
+      }, 4000);
     }
   }
 }
 
-Component.register(FallRespawn);
+hz.Component.register(FallRespawn);

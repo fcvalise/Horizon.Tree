@@ -4,7 +4,7 @@ import { TMath } from "_TreeMath";
 import * as hz from "horizon/core";
 
 export class SimpleBoids extends hz.Component<typeof SimpleBoids> {
-  neighborRadius: number = 10.0;
+  neighborRadius: number = 20.0;
   separationRadius: number = 3;
   
   alignWeight: number = 0.6;
@@ -33,7 +33,7 @@ export class SimpleBoids extends hz.Component<typeof SimpleBoids> {
     this.connectLocalBroadcastEvent(hz.World.onUpdate, (d) => this.onUpdate(d.deltaTime));
     this.rng = new RNG("Default");
     this.entity.simulated.set(false);
-    this.separationRadius = this.rng.range(3, 6);
+    this.separationRadius = this.rng.range(3, 12);
   }
 
   preStart() {

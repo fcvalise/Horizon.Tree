@@ -40,12 +40,11 @@ export class ShadowManager extends hz.Component<typeof ShadowManager> {
             if (shadow.isUse && shadow.caster) {
                 const bounds = shadow.caster.getRenderBounds();
                 const casterPosition =  shadow.caster.position.get();
-                // const raycastOrigin = new hz.Vec3(casterPosition.x, casterPosition.y - bounds.size().y * 0.5, casterPosition.z)
                 const raycastOrigin = bounds.center;
                 const hit = this.raycast.raycast(raycastOrigin, hz.Vec3.down);
                 
                 if (hit) {
-                    const position = new hz.Vec3(casterPosition.x, hit.hitPoint.y + 0.1, casterPosition.z);// hit.hitPoint.add(hz.Vec3.up.mul(0.1))
+                    const position = new hz.Vec3(casterPosition.x, hit.hitPoint.y + 0.1, casterPosition.z);
                     let direction = hit.normal;
                     const angle = hit.normal.angle().toDegrees();
                     if (angle > 50) { direction = hz.Vec3.up; }

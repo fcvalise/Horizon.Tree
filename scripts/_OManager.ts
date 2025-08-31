@@ -7,7 +7,7 @@ import { OEntityManager } from "_OEntityManager";
 import { OTerrain } from "_OTerrain";
 
 export class OisifManager extends hz.Component<typeof OisifManager> {
-    public static I: OisifManager;
+    public static I: OisifManager; // TODO : Should be removed
 
     private wrapper!: OWrapper;
     public pool!: OPoolManager;
@@ -19,13 +19,13 @@ export class OisifManager extends hz.Component<typeof OisifManager> {
     
     public preStart() {
         OisifManager.I = this;
-        this.random = new ORandom('Oisif');
+        this.random = new ORandom('Oisiff');
         this.wrapper = new OWrapper(this);
         this.pool = new OPoolManager(this.wrapper);
         this.manager = new OEntityManager(this.wrapper, this.pool);
 
         this.cloud = new OClouds(this.wrapper, this.pool, this.random);
-        this.terrain = new OTerrain(this.wrapper, this.manager, this.random, 20, 4);
+        this.terrain = new OTerrain(this.wrapper, this.manager, this.random, 40, 4);
     }
 
     public start() {}

@@ -12,15 +12,21 @@ export class OPoolEntity {
 }
 
 export class OPoolManager {
-    public static staticCount = 0;
+    public staticCount = 0;
     private pool: OPoolEntity[] = [];
-    private maxCount: number = 500;
+    private maxCount: number = 256;
+    private availableCount: number = 0;
 
     constructor(private wrapper: OWrapper) {
         this.createAsset();
         this.createAsset();
         this.createAsset();
         this.createAsset();
+        // this.getReserve();
+    }
+
+    public count() {
+        return this.availableCount;
     }
 
     public get(): hz.Entity | undefined {
@@ -28,10 +34,25 @@ export class OPoolManager {
         if (pEntity) {
             pEntity.lastUse = Date.now();
             pEntity.isUse = true;
+            this.availableCount--;
             this.updateUI();
             return pEntity.entity;
         }
         return undefined;
+    }
+
+    private getReserve() {
+        const reserve = this.wrapper.world.getEntitiesWithTags(['PoolReserve'])[0];
+        const children = reserve.children.get();
+        for (const child of children) {
+            const pEntity = new OPoolEntity(child);
+            child.interactionMode.set(hz.EntityInteractionMode.Physics);
+            child.simulated.set(false);
+            pEntity.isUse = false;
+            this.pool.push(pEntity);
+            this.availableCount++;
+            this.updateUI();
+        }
     }
 
     private async createAsset() {
@@ -41,12 +62,13 @@ export class OPoolManager {
         const scale = hz.Vec3.one;
         const promise = await this.wrapper.world.spawnAsset(asset, position, rotation, scale);
         const entity = promise[0];
-        const pEntity = new OPoolEntity(promise[0]);
+        const pEntity = new OPoolEntity(entity);
 
         entity.interactionMode.set(hz.EntityInteractionMode.Physics);
         entity.simulated.set(false);
         pEntity.isUse = false;
         this.pool.push(pEntity);
+        this.availableCount++;
         this.updateUI();
 
         if (this.pool.length < this.maxCount) {
@@ -55,11 +77,11 @@ export class OPoolManager {
     }
 
     public release(entity: hz.Entity) {
-        const poolObject = this.pool.find(p => p.entity == entity);
-        if (poolObject) {
-            poolObject.isUse = false;
-            poolObject.entity.scale.set(hz.Vec3.zero);
-            poolObject.entity.position.set(this.wrapper.entity.position.get());
+        const pEntity = this.pool.find(p => p.entity == entity);
+        if (pEntity) {
+            pEntity.isUse = false;
+            pEntity.entity.scale.set(hz.Vec3.zero);
+            this.availableCount++;
         }
         this.updateUI();
     }
@@ -69,11 +91,13 @@ export class OPoolManager {
     }
 
     private updateUI() {
-        let used = 0;
-        for (const pEntity of this.pool) { if (pEntity.isUse) used++; }
-        const percent = this.pool.length > 0 ? (used / this.pool.length) : 0;
         this.wrapper.component.sendNetworkBroadcastEvent(UpdateUIBar, {
-            id: 'PoolValue', percent: percent, current: used, total: this.pool.length
+            id: 'Dynamic',
+            percent: this.availableCount/this.pool.length,
+            text: `Used : ${this.availableCount}/${this.pool.length}`
+        });
+        this.wrapper.component.sendNetworkBroadcastEvent(UpdateUIBar, {
+            id: 'Static', percent: 0, text: `Static : ${this.staticCount}`
         });
     }
 }

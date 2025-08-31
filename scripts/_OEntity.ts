@@ -9,36 +9,50 @@ export class OEntity {
     private oScale: hz.Vec3 = hz.Vec3.zero;
     private oColor: hz.Color = hz.Color.white;
 
-    private syncAll: boolean = false;
-    private syncPosition: boolean = false;
-    private syncRotation: boolean = false;
-    private syncScale: boolean = false;
-    private syncColor: boolean = false;
+    private syncAll: boolean = true;
+    private syncPosition: boolean = true;
+    private syncRotation: boolean = true;
+    private syncScale: boolean = true;
+    private syncColor: boolean = true;
 
     private staticProxy: hz.Entity | undefined;
     private isReady: boolean = true;
     
-    constructor(public entity: hz.Entity | undefined, public wrapper: OWrapper, private pool: OPoolManager) {
-        this.wrapper.onUpdateUntil(()=> this.sync(), () => !Boolean(this.entity));
+    constructor(
+      public entity: hz.Entity | undefined,
+      public wrapper: OWrapper,
+      private pool: OPoolManager
+    ) { }
+
+    public dynamicCount() {
+      return this.pool.count();
     }
 
-    public makeDynamic() {
+    public makeDynamic(): boolean {
         if (this.getDynamic()) {
+            this.cancelTweens();
             this.deleteStatic();
+            return true;
         }
+        return false;
     }
 
-    public makeStatic() {
-        this.getStatic();
+    public makeStatic(): boolean {
+        if (this.getStatic()) {
+          this.cancelTweens();
+          return true;
+        }
+        return false;
     }
     
     public makeInvisible() {
         this.deleteDynamic();
         this.deleteStatic();
+        this.cancelTweens();
     }
 
     private getDynamic(): boolean {
-        if (!this.entity) {
+        if (!this.entity && this.pool.count() > 0) {
             this.entity = this.pool.get();
             this.syncAll = true;
             this.wrapper.onUpdateUntil(()=> this.sync(), () => !Boolean(this.entity));
@@ -55,13 +69,13 @@ export class OEntity {
     }
 
     private getStatic(): boolean {
-        if (!this.staticProxy && this.isReady) {
+        if (!this.staticProxy && this.isReady && this.entity) {
             this.isReady = false;
             const asset = new hz.Asset(BigInt(Library.matterStatic));
-            this.wrapper.world.spawnAsset(asset, this.oPosition.sub(hz.Vec3.down.mul(0.01)), this.oRotation, this.oScale.mul(0.98))
+            this.wrapper.world.spawnAsset(asset, this.oPosition.add(hz.Vec3.up.mul(0.01)), this.oRotation, this.oScale.mul(1.02))
             .then((promise) => {
                 this.staticProxy = promise[0];
-                OPoolManager.staticCount++;
+                this.pool.staticCount++;
                 this.isReady = true;
                 this.deleteDynamic();
             });
@@ -75,7 +89,7 @@ export class OEntity {
             this.isReady = false;
             this.wrapper.world.deleteAsset(this.staticProxy).then(() => {
                 this.staticProxy = undefined;
-                OPoolManager.staticCount--;
+                this.pool.staticCount--;
                 this.isReady = true;
             });
         }
@@ -135,8 +149,20 @@ function colorLerp(a: hz.Color, b: hz.Color, t: number): hz.Color {
 function quatSlerp(a: hz.Quaternion, b: hz.Quaternion, t: number): hz.Quaternion {
   const Q: any = hz.Quaternion as any;
   if (typeof Q.slerp === "function") return Q.slerp(a, b, t);
-  if (typeof Q.lerp === "function") return Q.lerp(a, b, t);
-  return t < 1 ? a.clone() : b.clone(); // last-resort snap
+  if (typeof Q.lerp === "function")  return Q.lerp(a, b, t);
+  return t < 1 ? a.clone() : b.clone();
+}
+
+// ---- unsubscribe helper (covers various Horizon shapes)
+function unsubscribe(sub: any) {
+  try {
+    if (!sub) return;
+    if (typeof sub === "function") { sub(); return; }
+    if (typeof sub.disconnect === "function") { sub.disconnect(); return; }
+    if (typeof sub.off === "function") { sub.off(); return; }
+    if (typeof sub.cancel === "function") { sub.cancel(); return; }
+    if (typeof sub.unsubscribe === "function") { sub.unsubscribe(); return; }
+  } catch { /* ignore */ }
 }
 
 // --- OEntity tween methods (prototype extension) ---
@@ -145,49 +171,54 @@ interface TweenArgs {
   rotation?: hz.Quaternion;
   scale?: hz.Vec3;
   color?: hz.Color;
-  duration: number;         // seconds
-  delay?: number;           // seconds
+  duration: number;   // seconds
+  delay?: number;     // seconds
   ease?: EaseFn;
+  makeStatic?: boolean;
 }
 
-declare module "_OEntity" { // if this file is _OEntity.ts; otherwise remove this block
+declare module "_OEntity" {
   interface OEntity {
     tweenTo(args: TweenArgs): Promise<void>;
-    moveTo(p: hz.Vec3, duration: number, ease?: EaseFn, delay?: number): Promise<void>;
-    moveBy(d: hz.Vec3, duration: number, ease?: EaseFn, delay?: number): Promise<void>;
-    rotateTo(q: hz.Quaternion, duration: number, ease?: EaseFn, delay?: number): Promise<void>;
-    scaleTo(s: hz.Vec3, duration: number, ease?: EaseFn, delay?: number): Promise<void>;
-    tintTo(c: hz.Color, duration: number, ease?: EaseFn, delay?: number): Promise<void>;
+    moveTo(p: hz.Vec3, duration: number, makeStatic?: boolean, ease?: EaseFn, delay?: number): Promise<void>;
+    moveBy(d: hz.Vec3, duration: number, makeStatic?: boolean, ease?: EaseFn, delay?: number): Promise<void>;
+    rotateTo(q: hz.Quaternion, duration: number, makeStatic?: boolean, ease?: EaseFn, delay?: number): Promise<void>;
+    scaleTo(s: hz.Vec3, duration: number, makeStatic?: boolean, ease?: EaseFn, delay?: number): Promise<void>;
+    scaleZeroTo(s: hz.Vec3, duration: number, makeStatic?: boolean, ease?: EaseFn, delay?: number): Promise<void>;
+    tintTo(c: hz.Color, duration: number, makeStatic?: boolean, ease?: EaseFn, delay?: number): Promise<void>;
     cancelTweens(): void;
-    /** @internal */ __tweenOffs?: Set<() => void>;
+    /** @internal */ __tweenSubs?: Set<any>;
   }
 }
 
-// keep per-entity update unsubscribes
 OEntity.prototype.cancelTweens = function (): void {
-  if (!this.__tweenOffs) return;
-  this.__tweenOffs?.forEach((off) => { try { off(); } catch {} });
-  this.__tweenOffs.clear();
+  if (!this.__tweenSubs) return;
+  this.__tweenSubs.forEach((sub) => unsubscribe(sub));
+  this.__tweenSubs.clear();
 };
 
 OEntity.prototype.tweenTo = function (args: TweenArgs): Promise<void> {
-  const ease = args.ease ?? Ease.cubicOut;
+  const makeStatic = args.makeStatic ?? true;
+  const ease  = args.ease ?? Ease.cubicOut;
   const delay = Math.max(0, args.delay ?? 0);
-  const dur = Math.max(0.0001, args.duration);
+  const dur   = Math.max(0.0001, args.duration);
 
-  // capture starts from LOCAL buffers (your getters clone)
+  // capture starts from LOCAL buffers (getters clone)
   const p0 = this.position, p1 = args.position ?? p0.clone();
   const q0 = this.rotation, q1 = args.rotation ?? q0.clone();
   const s0 = this.scale,    s1 = args.scale    ?? s0.clone();
   const c0 = this.color,    c1 = args.color    ?? c0.clone();
 
-  if (!this.__tweenOffs) this.__tweenOffs = new Set<() => void>();
+  if (!this.__tweenSubs) this.__tweenSubs = new Set<any>();
+
+  // ensure a flush on next frame even if your constructor's sync loop isn't running yet
+  (this as any).syncAll = true;
 
   let tAcc = 0;
-  let started = delay <= 0;
+  let started = (delay <= 0);
 
   return new Promise<void>((resolve) => {
-    const off = this.wrapper.onUpdate((dt) => {
+    const sub = this.wrapper.onUpdate((dt: number) => {
       tAcc += dt;
 
       if (!started) {
@@ -208,27 +239,35 @@ OEntity.prototype.tweenTo = function (args: TweenArgs): Promise<void> {
         if (args.rotation) this.rotation = q1.clone();
         if (args.scale)    this.scale    = s1.clone();
         if (args.color)    this.color    = c1.clone();
+        if (makeStatic) this.makeStatic()
 
-        try { off(); } catch {}
-        this.__tweenOffs!.delete(off);
+        unsubscribe(sub);
+        this.__tweenSubs!.delete(sub);
         resolve();
       }
     });
 
-    this.__tweenOffs?.add(off);
+    this.__tweenSubs!.add(sub);
   });
 };
 
-// convenience helpers
-OEntity.prototype.moveTo = function (p, duration, ease = Ease.cubicOut, delay = 0) {
-  return this.tweenTo({ position: p, duration, ease, delay });
+// convenience wrappers
+OEntity.prototype.moveTo = function (p, duration, makeStatic, ease = Ease.cubicOut, delay = 0) {
+  return this.tweenTo({ position: p, duration, makeStatic, ease, delay });
 };
-OEntity.prototype.rotateTo = function (q, duration, ease = Ease.cubicOut, delay = 0) {
-  return this.tweenTo({ rotation: q, duration, ease, delay });
+OEntity.prototype.moveBy = function (d, duration, makeStatic, ease = Ease.cubicOut, delay = 0) {
+  return this.tweenTo({ position: this.position.add(d), duration, makeStatic, ease, delay });
 };
-OEntity.prototype.scaleTo = function (s, duration, ease = Ease.cubicOut, delay = 0) {
-  return this.tweenTo({ scale: s, duration, ease, delay });
+OEntity.prototype.rotateTo = function (q, duration, makeStatic, ease = Ease.cubicOut, delay = 0) {
+  return this.tweenTo({ rotation: q, duration, makeStatic, ease, delay });
 };
-OEntity.prototype.tintTo = function (c, duration, ease = Ease.cubicOut, delay = 0) {
-  return this.tweenTo({ color: c, duration, ease, delay });
+OEntity.prototype.scaleTo = function (s, duration, makeStatic, ease = Ease.cubicOut, delay = 0) {
+  return this.tweenTo({ scale: s, duration, makeStatic, ease, delay });
+};
+OEntity.prototype.tintTo = function (c, duration, makeStatic, ease = Ease.cubicOut, delay = 0) {
+  return this.tweenTo({ color: c, duration, makeStatic, ease, delay });
+};
+OEntity.prototype.scaleZeroTo = function (s, duration, makeStatic, ease = Ease.cubicOut, delay = 0) {
+  this.scale = hz.Vec3.zero;
+  return this.tweenTo({ scale: s, duration, makeStatic, ease, delay });
 };

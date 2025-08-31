@@ -1,15 +1,15 @@
-import { Perlin } from "_Perlin";
+import { OPerlin } from "_OPerlin";
 import * as hz from "horizon/core";
 
 export class ORandom {
-    public perlin!: Perlin;
+    public perlin!: OPerlin;
 
     private state: number;
 
     constructor(public seed: number | string) {
         this.state = typeof seed === "number" ? seed >>> 0 : ORandom.fnv1a32(seed);
         if (this.state === 0) this.state = 0x9e3779b9; // avoid trivial zero
-        this.perlin = new Perlin('seed');
+        this.perlin = new OPerlin('seed');
     }
 
     // FNV-1a 32-bit hash (string -> 32-bit seed)

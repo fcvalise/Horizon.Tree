@@ -28,4 +28,12 @@ export class OWrapper {
     public onUpdateUntil(cb: (dt: number) => void, stop: () => boolean): void {
         const off = this.onUpdate((dt) => { if (stop()) return off(); cb(dt); });
     }
+
+    public onPlayerEnter(cb: (player: hz.Player) => void) : () => void {
+        const sub = this.component.connectCodeBlockEvent(this.component.entity, hz.CodeBlockEvents.OnPlayerEnterWorld,
+            (player: hz.Player) => { cb(player); });
+        this.subscriptions.push(sub);
+        console.warn('On player enter shortcut in wrapper is untested');
+        return () => { try { sub.disconnect?.(); } catch {} };
+    }
 }

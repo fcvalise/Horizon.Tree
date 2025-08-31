@@ -85,13 +85,13 @@ export class TreePool extends hz.Component<typeof TreePool> {
                 if (obj.inUse) used++;
             }
         });
-        const percent = total > 0 ? (used / total) : 0;
-        this.sendNetworkBroadcastEvent(UpdateUIBar, {
-            id: 'PoolValue',
-            percent: percent,
-            current: used,
-            total: total
-        });
+        // const percent = total > 0 ? (used / total) : 0;
+        // this.sendNetworkBroadcastEvent(UpdateUIBar, {
+        //     id: 'PoolValue',
+        //     percent: percent,
+        //     current: used,
+        //     total: total
+        // });
     }
 
     public async acquire(

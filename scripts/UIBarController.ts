@@ -1,6 +1,7 @@
+import { OPoolManager } from '_OPool';
 import * as hz from 'horizon/core';
 
-export const UpdateUIBar = new hz.NetworkEvent<{ id: string, percent: number, current: number, total: number }>('UpdateUIBar');
+export const UpdateUIBar = new hz.NetworkEvent<{ id: string, percent: number, text: string }>('UpdateUIBar');
 
 export class UIBarController extends hz.Component<typeof UIBarController> {
   static propsDefinition = {
@@ -10,18 +11,18 @@ export class UIBarController extends hz.Component<typeof UIBarController> {
 
   override preStart() {
     this.connectNetworkBroadcastEvent(UpdateUIBar, (data) => {
-      if (this.entity.tags.contains(data.id)) { this.updateValue(data.percent, data.current, data.total); }
+      if (this.entity.tags.contains(data.id)) { this.updateValue(data.percent, data.text); }
     });
   }
 
   override start() {
   }
 
-  public updateValue(percent: number, current: number, total: number) {
+  public updateValue(percent: number, text: string) {
     const clampedValue = Math.max(0, Math.min(1, percent));
     const newScale = new hz.Vec3(clampedValue, 1, 1);
     this.props.fill?.scale.set(newScale);
-    this.props.text?.as(hz.TextGizmo)!.text.set(`${current}/${total}`);
+    this.props.text?.as(hz.TextGizmo)!.text.set(text);
   }
 }
 

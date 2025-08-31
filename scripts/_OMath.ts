@@ -1,5 +1,7 @@
 import * as hz from "horizon/core";
 
+export {}
+
 declare global {
   interface Number {
     toRadians(): number;
@@ -18,6 +20,8 @@ Number.prototype.toDegrees = function(): number {
 declare module "horizon/core" {
   interface Vec3 {
     angle(axis?: hz.Vec3): number;
+    rotateArround(deg: number, axis?: hz.Vec3): hz.Vec3;
+
   }
 }
 
@@ -27,6 +31,17 @@ hz.Vec3.prototype.angle = function(axis: hz.Vec3 = hz.Vec3.up): number {
     const b = hz.Vec3.normalize(axis);
     const dot = Math.max(-1, Math.min(1, hz.Vec3.dot(a, b)));
     return Math.acos(dot); // radians
+}
+
+hz.Vec3.prototype.rotateArround = function(deg: number, axis: hz.Vec3 = hz.Vec3.up): hz.Vec3 {
+    const v = (this as hz.Vec3);
+    const rad = deg.toRadians();
+    const u = axis.normalize();
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    const term1 = v.mul(cos);
+    const term2 = hz.Vec3.cross(u, v).mul(sin);
+    const term3 = u.mul(hz.Vec3.dot(u, v) * (1 - cos));
+    return term1.add(term2).add(term3);
 }
 
 // export class OMath {
