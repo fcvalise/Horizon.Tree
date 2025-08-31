@@ -84,14 +84,13 @@ export class OTerrain {
             const position = new hz.Vec3(posX, posY, posZ).add(startPos);
             //rotation
             const lookAtDir = hz.Vec3.down.mul(10).add(this.random.vectorHalf());
-            // const twist = TMath.rotateAroundAxis(lookAtDir, lookAtDir, this.random.range(0, 360));
             const twist = lookAtDir.rotateArround(this.random.range(0, 360), lookAtDir);
             const rotation = hz.Quaternion.lookRotation(twist);
             // scale
             const scaleXZRandom = this.random.next() * 0.5;
             const scaleX = 6 * (1.5 - noise + scaleXZRandom);
             const scaleY = 6 * (1.5 - noise + scaleXZRandom);
-            const scaleZ = 6 * (1 - noise + this.random.next());
+            const scaleZ = 100;
             const scale = new hz.Vec3(scaleX, scaleY, scaleZ);
             // color
             const r = 0.8 * this.random.range(0.98, 1.02) * noise;

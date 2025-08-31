@@ -9,6 +9,7 @@ declare global {
   interface Number {
     toRadians(): number;
     toDegrees(): number;
+    clamp01(): number;
   }
 }
 
@@ -22,6 +23,13 @@ Number.prototype.toRadians = function(): number {
 
 Number.prototype.toDegrees = function(): number {
   return (this as number) * 180 / Math.PI;
+};
+
+Number.prototype.clamp01 = function (): number {
+  const v = this as number;
+  if (v < 0) return 0;
+  if (v > 1) return 1;
+  return v;
 };
 
 declare module "horizon/core" {

@@ -184,12 +184,10 @@ export class TreeGrowth {
                 bud.oEntity.scaleZeroTo(bud.oEntity.scale, this.random.range(1, 4))
                 .then(() => {
                     this.enqueueSegment(bud, direction, nextPosition);
+                    if (bud.depth / this.treeSettings.maxDepth > 0.4) {// && bud.length > this.settings.growth.segmentLength * 0.4) {
+                        this.leaves.placeLeaves(bud, direction, bud.length);
+                    }
                 })
-                // .then(() => {
-                //     if (bud.depth / this.settings.growth.maxDepth > 0.4) {// && bud.length > this.settings.growth.segmentLength * 0.4) {
-                //         // await this.leaves.placeLeaves(bud, dir, bud.length);
-                //     }
-                // });
             }
         } else {
             this.growthQueue.push(bud);

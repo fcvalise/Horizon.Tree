@@ -32,7 +32,7 @@ const DefaultSettings: TreeSettings = {
         leafAssetId: Library.matter,
     },
     leaf: {
-        scale: 0.8,
+        scale: 1.6,
         count: 2,
         petioleLength: 0.1,
         axialJitter: 0.08,
@@ -54,6 +54,10 @@ const DefaultSettings: TreeSettings = {
 const pick = <T>(arr: readonly T[]): T =>
 arr[Math.floor(RNG.get().range(0, arr.length))];
 
+export function cloneSettings(settings: TreeSettings): TreeSettings {
+  return JSON.parse(JSON.stringify(settings)) as TreeSettings;
+}
+
 export class TreeBase {
     public settings: TreeSettings = DefaultSettings;
     public isGrowing: boolean = true;
@@ -65,6 +69,8 @@ export class TreeBase {
         overrides?: Partial<TreeSettings>
     ) {
         // this.settings = mergeSettings(DefaultSettings, this.getRandomSettings(position));
+        this.settings = cloneSettings(DefaultSettings);
+        this.settings.branch.length = 1 + Math.random() * 3;
         this.growth = new TreeGrowth(position, wrapper, this.settings);
         this.wrapper.onUpdateUntil(() => this.growth.step(), () => !this.isGrowing);
 
