@@ -14,6 +14,13 @@ export class OWrapper {
         this.entity = component.entity;
     }
 
+    public getTaggedObject(tag: string) {
+        const taggedList = this.world.getEntitiesWithTags([tag]);
+        if (taggedList.length > 1) { console.warn(`${taggedList.length} object tagged ${tag} founded`); }
+        if (taggedList.length == 0) { console.warn(`No object tagged ${tag} founded`)}
+        return taggedList[0];
+    }
+
     public isServer() {
         return this.entity.owner.get() == this.world.getServerPlayer();
     }

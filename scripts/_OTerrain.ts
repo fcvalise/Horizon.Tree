@@ -6,11 +6,14 @@ import { OWrapper } from "_OWrapper";
 import { ORandom } from "_ORandom";
 import { OEntityManager } from "_OEntityManager";
 import { UpdateUIBar } from "UIBarController";
-import { TreeBase } from "_TreeBase";
+import { OEvent } from "_OEvent";
+import { OColor } from "_OColor";
+import { OMelody } from "_OMelody";
 
 class Cell {
     public oEntity: OEntity | undefined;
     public discovered: boolean = false;
+    public instanciated: boolean = false;
 
     constructor(
         public position: hz.Vec3,
@@ -21,7 +24,11 @@ class Cell {
 }
 
 export class OTerrain {
+    private readonly discoverRange = 10;
+    private readonly maxDistance = 25; 
     private cellArray: Cell[] = [];
+    private melody!: OMelody;
+    private melodyIndex = 0;
     
     constructor(
         private wrapper: OWrapper,
@@ -32,6 +39,17 @@ export class OTerrain {
     ) {
         this.create();
         wrapper.onUpdate(() => this.update());
+        this.melody = new OMelody(wrapper);
+        // mellow pentatonic minor in A, lower band
+        // this.melody.useScale("pentMin").useKey("A").setOctaves(-1, 0);
+        // bright major in D across two octaves
+        this.melody.useScale("major").useKey("D").setOctaves(0, 2);
+        // Japanese color (Hirajoshi), slower tempo
+        // this.melody.useScale("hirajoshi").useKey("C").setOctaves(0, 1).setTempo(110);
+        // Whole-tone sci-fi sweeps
+        // this.melody.useScale("wholeTone").useKey("C").setOctaves(0, 1);
+
+
     }
 
     private update() {
@@ -39,19 +57,27 @@ export class OTerrain {
             const distance = this.minPlayerDistance(cell.position);
             if (!cell.oEntity) {
                 cell.oEntity = this.manager.create()
-            } else if (!cell.discovered && distance < 15) {
+            } else if (!cell.discovered && distance < this.discoverRange) {
                 cell.oEntity.scale = cell.scale;
                 cell.oEntity.color = cell.color;
                 cell.oEntity.position = cell.position;
                 cell.oEntity.rotation = cell.rotation;
                 if (cell.oEntity.makeDynamic()) {
                     cell.discovered = true;
+                    this.melody.trigger(cell.position, this.melodyIndex++);
                     cell.oEntity.scaleZeroTo(cell.scale, 0.8)
                     .then(() => {
-                        if (this.random.bool(0.3)) {
-                            new TreeBase(this.wrapper, cell.position);
-                        }
+                        this.wrapper.component.sendNetworkBroadcastEvent(OEvent.onTerrainSpawn, { entity: cell.oEntity?.entity! });
                     });
+                }
+            } else if (!cell.discovered && !cell.instanciated) {
+                cell.oEntity.position = cell.position;
+                cell.oEntity.rotation = cell.rotation;
+                cell.oEntity.scale = cell.scale;
+                cell.oEntity.color = OColor.Grey;
+                if (cell.oEntity.makeDynamic()) {
+                    cell.instanciated = true;
+                    cell.oEntity.scaleZeroTo(cell.oEntity.scale, 0.8)
                 }
             }
         }
@@ -76,7 +102,7 @@ export class OTerrain {
         const startPos = new hz.Vec3(half, 0, half);
         const perlin = this.random.perlin;
         OUtils.spiralGrid(this.gridSize, this.gridSize, (x, z, i) => {
-            const noise = perlin.ridged2(x * 0.2, z * 0.2);
+            let noise = perlin.ridged2(x * 0.2, z * 0.2);
             // position
             const posX = x * this.cellSize + this.cellSize * 0.5;
             const posY = this.easeInExpo(noise) * 2;
@@ -85,23 +111,31 @@ export class OTerrain {
             //rotation
             const lookAtDir = hz.Vec3.down.mul(10).add(this.random.vectorHalf());
             const twist = lookAtDir.rotateArround(this.random.range(0, 360), lookAtDir);
-            const rotation = hz.Quaternion.lookRotation(twist);
+            let rotation = hz.Quaternion.lookRotation(twist);
             // scale
             const scaleXZRandom = this.random.next() * 0.5;
             const scaleX = 6 * (1.5 - noise + scaleXZRandom);
             const scaleY = 6 * (1.5 - noise + scaleXZRandom);
             const scaleZ = 100;
-            const scale = new hz.Vec3(scaleX, scaleY, scaleZ);
+            let scale = new hz.Vec3(scaleX, scaleY, scaleZ);
             // color
             const r = 0.8 * this.random.range(0.98, 1.02) * noise;
             const g = 0.94 * this.random.range(0.98, 1.02) * noise;
             const b = 0.1 * this.random.range(0.98, 1.02) * noise;
-            const color = new hz.Color(r, g, b);
+            let color = new hz.Color(r, g, b);
+            color = OColor.LightGreen;
 
-            const maxDistance = 60;
-            const distance = hz.Vec3.zero.distance(position) / maxDistance;
-            position.y -= distance * distance * 0.5;
-            if (position.y > 0 && posY > 0.1) {
+            // if (noise > 0.85) {
+            //     color = new hz.Color(0.5, 0.5, 0.5);
+            //     rotation = hz.Quaternion.lookRotation(this.random.vectorHalf());
+            //     const scaleXYZ = this.random.range(2, 6) * noise;
+            //     position.y -= scaleXYZ * 0.5;
+            //     scale = new hz.Vec3(scaleXYZ, scaleXYZ, scaleXYZ);
+            // }
+
+            const distance = hz.Vec3.zero.distance(position) / this.maxDistance;
+            noise -= distance * distance * 0.5;
+            if (noise > 0.2) {
                 const cell = new Cell(position, rotation, scale, color);
                 this.cellArray.push(cell);
             }

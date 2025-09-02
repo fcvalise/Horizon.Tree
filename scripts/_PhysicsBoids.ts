@@ -145,6 +145,9 @@ export class SimpleBoidForces extends hz.Component<typeof SimpleBoidForces> {
       const brake = TMath.vScale(hz.Vec3.normalize(vel), -brakeGain * (excess / this.maxSpeed));
       this.body.applyForce(brake, hz.PhysicsForceMode.Force);
     }
+
+    const rotation = hz.Quaternion.lookRotation(this.entity.forward.get());
+    this.entity.rotation.set(rotation);
   }
 
   private computePlayerAvoidance(selfPos: hz.Vec3): hz.Vec3 | null {

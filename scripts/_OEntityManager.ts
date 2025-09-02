@@ -21,4 +21,16 @@ export class OEntityManager {
             this.simulatedList.push(oEntity);
         }
     }
+
+    public get(entity: hz.Entity): OEntity | undefined {
+        const staticOE = this.allList.find(oe => oe.staticProxy == entity);
+        if (staticOE) {
+            return staticOE;
+        }
+        const dynamicOE = this.allList.find(oe => oe.entity == entity);
+        if (dynamicOE) {
+            return dynamicOE;
+        }
+        return undefined;
+    }
 }

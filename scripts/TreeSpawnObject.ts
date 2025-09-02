@@ -1,4 +1,5 @@
 import { Library } from '_Library';
+import { OisifManager } from '_OManager';
 import { TreeEvent } from '_TreeEvent';
 import { TreePool } from '_TreePool';
 import LocalCamera from 'horizon/camera';
@@ -142,18 +143,27 @@ class TreeSpawnObject extends hz.Component<typeof TreeSpawnObject> {
     // this.sendNetworkBroadcastEvent(TreeEvent.localRacastDebug, { position: cameraPos, direction: cameraFwd });
     const hit = this.castCameraRay();
     if (hit && hit.targetType == hz.RaycastTargetType.Entity) {
-      var hitEntity = hit.target.as(hz.Entity);
-      // hitEntity.as(hz.MeshEntity).style.tintColor.set(hz.Color.blue)
-      if (hit.target.tags.contains('Soil')) {
-        console.log(`Sent spawn tree event`);
-        
-        this.sendNetworkBroadcastEvent(TreeEvent.spawnTree, { player: player, position: hit.hitPoint });
-      } else {
-        console.log(`Sent spawn tree event`);
-        this.sendNetworkBroadcastEvent(TreeEvent.spawnTree, { player: player, position: hit.hitPoint });
+      // const oEntity = OisifManager.I.manager.get(hit.target);
+      // if (oEntity) {
+      //   console.log(`Touch ${oEntity.entity?.name.get()}`);
+      //   oEntity.makeDynamic();
+      //   oEntity.entity?.simulated.set(true);
+      // } else {
+      //   console.log(`No touch`);
+      // }
 
-        this.sendNetworkBroadcastEvent(TreeEvent.pruneTree, { entity: hit.target, player: player });
-      }
+      // var hitEntity = hit.target.as(hz.Entity);
+      // // hitEntity.as(hz.MeshEntity).style.tintColor.set(hz.Color.blue)
+      // if (hit.target.tags.contains('Soil')) {
+      //   console.log(`Sent spawn tree event`);
+        
+      //   this.sendNetworkBroadcastEvent(TreeEvent.spawnTree, { player: player, position: hit.hitPoint });
+      // } else {
+      //   console.log(`Sent spawn tree event`);
+      //   this.sendNetworkBroadcastEvent(TreeEvent.spawnTree, { player: player, position: hit.hitPoint });
+
+      //   this.sendNetworkBroadcastEvent(TreeEvent.pruneTree, { entity: hit.target, player: player });
+      // }
     }
 
     this.setAvatarPose(player, hz.AvatarGripPose.Shield);

@@ -20,7 +20,7 @@ class Computer extends hz.Component<typeof Computer> {
   }
 
   private update(dt: number) {
-    this.physics.springPushTowardPosition(this.position, {stiffness: 10, damping: 0.2, axisIndependent: false});
+    this.physics.springPushTowardPosition(this.position, {stiffness: 10, damping: 1, axisIndependent: false});
     this.physics.springSpinTowardRotation(this.rotation, {stiffness: 10, damping: 1, axisIndependent: false});
   }
 }

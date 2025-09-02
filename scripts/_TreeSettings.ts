@@ -22,6 +22,7 @@ export type RenderSettings = {
     leafAssetId?: number;
 };
 export type LeafSettings = {
+    minBranch: number;
     scale: number;
     count: number;
     petioleLength: number;

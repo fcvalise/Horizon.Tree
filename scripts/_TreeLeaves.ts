@@ -3,12 +3,13 @@ import { OisifManager } from "_OManager";
 import { ORandom } from "_ORandom";
 import { OWrapper } from "_OWrapper";
 import { Bud } from "_TreeGrowth";
-import { LeafSettings, RenderSettings } from "_TreeSettings";
+import { LeafSettings, TreeSettings } from "_TreeSettings";
+import { OColor } from "_OColor";
 
 export class TreeLeaves {
     constructor(
         private wrapper: OWrapper,
-        private renderSettings: RenderSettings,
+        private treeSettings: TreeSettings,
         private settings: LeafSettings,
         private random: ORandom
     ) {
@@ -24,7 +25,7 @@ export class TreeLeaves {
                 oEntity.position = nodeOrigin.add(radial.mul(this.settings.petioleLength));
                 oEntity.rotation = hz.Quaternion.lookRotation(radial, upY);
                 oEntity.scale = hz.Vec3.one.mul(this.settings.scale);
-                oEntity.color = new hz.Color(0.01, 0.01, 0.01);
+                oEntity.color = OColor.LightGreen;
                 oEntity.scaleZeroTo(oEntity.scale, this.random.range(1, 4))
                 bud.oEntityList?.push(oEntity);
             }
@@ -34,7 +35,8 @@ export class TreeLeaves {
     };
 
     public async placeLeaves(bud: Bud, forward: hz.Vec3, segLen: number): Promise<void> {
-        if (!this.renderSettings.leafAssetId) return;
+        if (bud.depth / this.treeSettings.maxDepth < this.settings.minBranch) return; // && bud.length > this.settings.growth.segmentLength * 0.4) {
+
         const vcount = Math.max(1, this.settings.count);
         forward = forward.normalize();
 

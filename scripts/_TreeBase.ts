@@ -2,8 +2,10 @@ import * as hz from "horizon/core";
 import { Library } from "_Library";
 import { RNG } from "_RNG";
 import { OWrapper } from "_OWrapper";
-import { mergeSettings, TreeSettings } from "_TreeSettings";
+import { TreeSettings } from "_TreeSettings";
 import { TreeGrowth } from "_TreeGrowth";
+import { ORaycast } from "_ORaycast";
+import { OEntity } from "_OEntity";
 
 const DefaultSettings: TreeSettings = {
     seed: 'MyTree',
@@ -32,6 +34,7 @@ const DefaultSettings: TreeSettings = {
         leafAssetId: Library.matter,
     },
     leaf: {
+        minBranch: 0.4,
         scale: 1.6,
         count: 2,
         petioleLength: 0.1,
@@ -71,14 +74,30 @@ export class TreeBase {
         // this.settings = mergeSettings(DefaultSettings, this.getRandomSettings(position));
         this.settings = cloneSettings(DefaultSettings);
         this.settings.branch.length = 1 + Math.random() * 3;
+        this.addShadow(position);
         this.growth = new TreeGrowth(position, wrapper, this.settings);
         this.wrapper.onUpdateUntil(() => this.growth.step(), () => !this.isGrowing);
-
 
         // this.component.connectNetworkBroadcastEvent(TreeEvent.spawnTreeDescription, (payload) => {
         //     this.createTreeDescription(payload.position);
         // });
         // this.createTreeDescription(position.add(hz.Vec3.up.add(hz.Vec3.forward)));
+    }
+
+    private addShadow(position: hz.Vec3) {
+        const raycast = new ORaycast(this.wrapper);
+        const hit = raycast.cast(position.add(hz.Vec3.up), hz.Vec3.down);
+        if (hit) {
+            const asset = new hz.Asset(BigInt(Library.shadow));
+            const forward = hit.target.forward.get();
+            const right = hit.target.right.get();
+            const rotation = hz.Quaternion.lookRotation(forward.rotateArround(180, right));
+            const scale = hz.Vec3.one.mul(this.settings.branch.length);
+            const position = hit.hitPoint.add(hz.Vec3.up.mul(0.05));
+
+            this.wrapper.world.spawnAsset(asset, position, rotation, scale)
+            .then((promise) => { });
+        }
     }
 
     // createTreeDescription(position: hz.Vec3) {

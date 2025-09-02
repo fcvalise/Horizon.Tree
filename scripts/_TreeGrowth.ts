@@ -10,6 +10,8 @@ import { OEntity } from "_OEntity";
 import { ORandom } from "_ORandom";
 import { ORaycast } from "_ORaycast";
 import { OWrapper } from "_OWrapper";
+import { PlayerLocal } from "_PlayerLocal";
+import { OColor } from "_OColor";
 
 export type Bud = {
     position: hz.Vec3;
@@ -58,13 +60,16 @@ export class TreeGrowth {
         this.raycast = new ORaycast(this.wrapper);
         this.architecture = new TreeArchitecture(treeSettings, treeSettings.architecture);
         this.tropisms = new TreeTropisms(this.architecture, treeSettings.tropism, this.raycast, this.random);
-        this.leaves = new TreeLeaves(this.wrapper, treeSettings.render, treeSettings.leaf, this.random);
+        this.leaves = new TreeLeaves(this.wrapper, treeSettings, treeSettings.leaf, this.random);
         this.settings = treeSettings.branch;
 
         this.createRoot();
 
         this.wrapper.component.connectNetworkBroadcastEvent(TreeEvent.pruneTree, (payload) => {
             this.prune(payload.entity);
+        });
+            this.wrapper.component.connectNetworkBroadcastEvent(PlayerLocal.onTouch, (payload) => {
+            this.prune(payload.hit.target);
         });
     }
 
@@ -122,29 +127,34 @@ export class TreeGrowth {
     }
 
     public prune(entity: hz.Entity) {
-        // const budRoot = this.budMap.get(entity);
-        // if (budRoot) {
-        //     console.log(JSON.stringify(this.settings));
-        //     this.removeBranch(budRoot);
-        //     if (this.settings.growth.growAfterPrune) {
-        //         budRoot.children = [];
-        //         budRoot.oEntityList = [];
-        //         budRoot.isPruned = false;
-        //         this.growthQueue.push(budRoot);
-        //     }
-        // }
+        const oEntity = OisifManager.I.manager.get(entity);
+        if (oEntity) {
+            const budRoot = this.budMap.get(oEntity);
+            if (budRoot) {
+                console.log(JSON.stringify(this.settings));
+                this.removeBranch(budRoot);
+                if (this.settings.growAfterPrune) {
+                    budRoot.children = [];
+                    budRoot.oEntityList = [];
+                    budRoot.isPruned = false;
+                    this.growthQueue.push(budRoot);
+                }
+            }
+        }
     }
 
     private async removeBranch(bud: Bud) {
         bud.isPruned = true;
-        // await TreeTween.waitFor(this.component, () => Boolean(bud.created));
-        // for (const entity of bud.oEntityList) {
-        //     // TreePool.I.release(entity);
-        // }
-        // bud.oEntityList = [];
-        // for (const child of bud.children) {
-        //     this.removeBranch(child);
-        // }
+        // bud.oEntity?.cancelTweens();
+        // bud.oEntity?.makePhysic();
+        for (const oEntity of bud.oEntityList) {
+            oEntity?.cancelTweens();
+            oEntity?.makePhysic();
+        }
+        bud.oEntityList = [];
+        for (const child of bud.children) {
+            this.removeBranch(child);
+        }
     }
     
     private isPrunedParent(budRoot: Bud) {
@@ -178,16 +188,15 @@ export class TreeGrowth {
                 bud.oEntity.position = bud.position;
                 bud.oEntity.rotation = hz.Quaternion.lookRotation(forward);
                 bud.oEntity.scale = new hz.Vec3(width, width, bud.length);
-                bud.oEntity.color = new hz.Color(0.01, 0.01, 0.01);
+                bud.oEntity.color = OColor.Black;
                 bud.oEntityList.push(bud.oEntity);
                 this.budMap.set(bud.oEntity, bud);
                 bud.oEntity.scaleZeroTo(bud.oEntity.scale, this.random.range(1, 4))
                 .then(() => {
+                    this.leaves.placeLeaves(bud, direction, bud.length);
+
                     this.enqueueSegment(bud, direction, nextPosition);
-                    if (bud.depth / this.treeSettings.maxDepth > 0.4) {// && bud.length > this.settings.growth.segmentLength * 0.4) {
-                        this.leaves.placeLeaves(bud, direction, bud.length);
-                    }
-                })
+                });
             }
         } else {
             this.growthQueue.push(bud);
