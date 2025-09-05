@@ -26,7 +26,7 @@ export class FallRespawn extends hz.Component<typeof FallRespawn> {
   private checkPlayerPosition(player: hz.Player) {
     const playerPosition = player.position.get();
     const lastPosition = this.playerMap.get(player)!;
-    if (playerPosition.y < this.props.fallThreshold) {
+    if (lastPosition && playerPosition.y < this.props.fallThreshold) {
       this.spawnPointGizmo?.position.set(lastPosition.add(hz.Vec3.up.mul(3)));
       this.spawnPointGizmo?.teleportPlayer(player);
     }
