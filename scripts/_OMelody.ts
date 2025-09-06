@@ -45,6 +45,17 @@ export class OMelody {
     C:0,"C#":1,Db:1,D:2,"D#":3,Eb:3,E:4,F:5,"F#":6,Gb:6,G:7,"G#":8,Ab:8,A:9,"A#":10,Bb:10,B:11
   };
 
+  private evolutionStages = [
+    // [minCount, preset]
+    { min: 0,    preset: { bpm: 140, key: "C", octaves: [0, 1] as [number, number] } },
+    { min: 50,   preset: { bpm: 170, key: "D", octaves: [0, 2] as [number, number] } },
+    { min: 120,  preset: { bpm: 200, key: "E", octaves: [0, 2] as [number, number] } },
+    { min: 220,  preset: { bpm: 220, key: "G", octaves: [0, 3] as [number, number] } },
+  ];
+
+  // Optional: avoid thrashing when count jitters around a boundary
+  private currentStageMin = -1;
+
   // --- Config (set once, forget) ---
   private scale: readonly number[] = OMelody.SCALES.pentMaj;
   private keySemis = 0;
@@ -131,6 +142,27 @@ export class OMelody {
     const dur = 0.12 + 0.08 * this.rng.next();
     this.pending.push({ pos, vel, dur, group });
     if (!this.quantize) this.flushTick(); // immediate play mode
+  }
+
+  public setObjectCount(total: number) {
+    // pick the highest stage whose min <= total
+    const stage = this.evolutionStages
+      .filter(s => total >= s.min)
+      .sort((a,b) => b.min - a.min)[0];
+
+    if (!stage) return;
+
+    // guard: only apply if stage changed
+    if (stage.min === this.currentStageMin) return;
+    this.currentStageMin = stage.min;
+
+    // apply preset (tiny, readable)
+    this.setQuantize(true, { bpm: stage.preset.bpm, maxPerTick: this.qMaxPerTick });
+    this.useKey(stage.preset.key);
+    this.setOctaves(stage.preset.octaves[0], stage.preset.octaves[1]);
+
+    // (optional) tiny musical shift on each stage bump:
+    // this.transpose = (this.transpose + 2) % 12; // step through keys by whole tone
   }
 
   // ---------- Internals (short & clear) ----------

@@ -4,8 +4,13 @@ import { OWrapper } from "_OWrapper";
 import { OPoolManager } from "_OPool";
 import { OColor } from "_OColor";
 import { Easing } from "_Easing";
+import { OMelody } from "_OMelody";
+import { OTrail } from "_OTrail";
 
 export class OEntity {
+  private static melody: OMelody | undefined = undefined;
+  private static trail: OTrail | undefined = undefined; // TODO : Use trail
+
   private oPosition: hz.Vec3 = hz.Vec3.zero;
   private oRotation: hz.Quaternion = hz.Quaternion.zero;
   private oScale: hz.Vec3 = hz.Vec3.zero;
@@ -19,6 +24,8 @@ export class OEntity {
 
   public staticProxy: hz.Entity | undefined;
   private isReady: boolean = true;
+  private timestamp: number = Date.now();
+  public tags: string[] = [];
 
   constructor(
     public entity: hz.Entity | undefined,
@@ -26,12 +33,9 @@ export class OEntity {
     private pool: OPoolManager
   ) { }
 
-  public dynamicCount() {
-    return this.pool.count();
-  }
-
   public makeDynamic(): boolean {
     if (this.getDynamic()) {
+      this.playMelody();
       this.cancelTweens();
       this.deleteStatic();
       return true;
@@ -39,6 +43,19 @@ export class OEntity {
     return false;
   }
 
+  public makePhysic(): boolean {
+    if (this.entity) {
+      this.playMelody();
+      this.cancelTweens();
+      this.entity.simulated.set(true);
+      this.updatePhysics();
+      this.color = OColor.Orange;
+      this.timestamp = Date.now();
+      return true;
+    }
+    return false;
+  }
+  
   public makeStatic(needDynamic: boolean = true): boolean {
     if (this.getStatic(needDynamic)) {
       this.cancelTweens();
@@ -48,15 +65,10 @@ export class OEntity {
   }
 
   public makeInvisible() {
-    this.deleteDynamic();
-    this.deleteStatic();
-    this.cancelTweens();
-  }
-
-  public makePhysic() {
-    if (this.makeDynamic()) {
-      this.entity?.simulated.set(true);
-      this.entity?.as(hz.PhysicalEntity).applyForce(hz.Vec3.up.mul(0.05), hz.PhysicsForceMode.Impulse);
+    if (this.staticProxy || this.entity) {
+      this.deleteDynamic();
+      this.deleteStatic();
+      this.cancelTweens();
     }
   }
 
@@ -64,7 +76,9 @@ export class OEntity {
     if (!this.entity && this.pool.count() > 0) {
       this.entity = this.pool.get();
       this.syncAll = true;
+      this.entity?.tags.set(this.tags);
       this.wrapper.onUpdateUntil(() => this.sync(), () => !Boolean(this.entity));
+      this.timestamp = Date.now();
       return true;
     }
     return false;
@@ -80,16 +94,24 @@ export class OEntity {
   private getStatic(needDynamic: boolean): boolean {
     if (!this.staticProxy && this.isReady && (this.entity || !needDynamic)) {
       this.isReady = false;
+      this.oColor = OColor.White;
       const id = Library.colorMap.get(this.oColor)!;
       const asset = new hz.Asset(BigInt(id));
       const position = this.oPosition.add(this.oRotation.forward.mul(-0.01))
+      const timestamp = this.timestamp = Date.now();
       this.wrapper.world.spawnAsset(asset, position, this.oRotation, this.oScale.mul(1.02))
-        .then((promise) => {
-          this.staticProxy = promise[0];
-          this.pool.staticCount++;
-          this.isReady = true;
+      .then((promise) => {
+        this.staticProxy = promise[0];
+        this.staticProxy?.tags.set(this.tags);
+        this.pool.staticCount++;
+        this.isReady = true;
+        if (timestamp < this.timestamp) {// something happen in between
+          this.deleteStatic();
+        } else {
           this.deleteDynamic();
-        });
+          this.oColor = OColor.Grey;
+        }
+      });
       return true;
     }
     return false;
@@ -98,12 +120,41 @@ export class OEntity {
   private deleteStatic() {
     if (this.staticProxy && this.isReady) {
       this.isReady = false;
-      this.wrapper.world.deleteAsset(this.staticProxy).then(() => {
+      this.staticProxy.visible.set(false);
+      this.wrapper.world.deleteAsset(this.staticProxy)
+      .then(() => {
         this.staticProxy = undefined;
         this.pool.staticCount--;
         this.isReady = true;
       });
     }
+  }
+
+  private updatePhysics() {
+    this.wrapper.component.async.setTimeout(() => {
+      this.wrapper.onUpdateUntil(() => {
+        this.oPosition = this.entity!.position.get();
+        this.oRotation = this.entity!.rotation.get();
+      }, () => (!Boolean(this.entity) || !this.entity!.simulated.get()!))
+    }, 500);
+  }
+
+  public setTags(tags: string[]) {
+    this.entity?.tags.set(tags);
+    this.tags = tags;
+  }
+
+  private playMelody() {
+    if (!OEntity.melody) {
+      OEntity.melody = new OMelody(this.wrapper, "Note")
+        .useScale("mixolydian")
+        .useKey("D")
+        .setOctaves(0, 2)
+        .setQuantize(true, { bpm: 300, maxPerTick: 12 });
+    }
+    // just pass position + your own tags; OMelody does the rest
+    OEntity.melody.triggerWithTags(this.position.mul(1), this.tags);
+    OEntity.melody.setObjectCount((this.pool.staticCount + this.pool.count()) * 0.1);
   }
 
   public sync() {
@@ -113,14 +164,6 @@ export class OEntity {
       if (this.syncColor || this.syncAll) { mesh.style.tintColor.set(this.oColor); this.syncColor = false; }
       if (this.syncPosition || this.syncAll) { this.entity.position.set(this.oPosition); this.syncPosition = false; }
       if (this.syncRotation || this.syncAll) { this.entity.rotation.set(this.oRotation); this.syncRotation = false; }
-      if (this.entity.simulated.get()) {
-        if (this.entity.as(PhysicalEntity).velocity.get().length() < 0.05) {
-          this.oPosition = this.entity.position.get();
-          this.oRotation = this.entity.rotation.get();
-          this.entity.simulated.set(false);
-          this.makeStatic();
-        }
-      }
       this.syncAll = false;
     }
   }
@@ -132,6 +175,7 @@ export class OEntity {
   get isDynamic(): boolean { return Boolean(this.entity); }
   get isStatic(): boolean { return Boolean(this.staticProxy); }
   get isPhysics(): boolean { return this.entity?.simulated.get() ?? false; }
+  get isInvisible(): boolean { return !this.staticProxy && this.isReady && !this.entity; }
 
   set position(p: hz.Vec3) { this.oPosition = p; this.syncPosition = true }
   set rotation(p: hz.Quaternion) { this.oRotation = p; this.syncRotation = true }
@@ -148,6 +192,8 @@ const Ease = {
   cubicOut: (t: number) => 1 - Math.pow(1 - t, 3),
   easeOutBounce: (t:number) => Easing.easeOutBounce(t),
   easeOutElastic: (t:number) => Easing.easeOutElastic(t),
+  easeOutBack: (t:number) => Easing.easeOutBack(t),
+  custom: (t:number) => Easing.fastInBumpOut(t),
 } as const;
 
 // --- HELPERS ---
@@ -273,22 +319,22 @@ OEntity.prototype.tweenTo = function (args: TweenArgs): Promise<void> {
 };
 
 // convenience wrappers
-OEntity.prototype.moveTo = function (p, duration, makeStatic, ease = Ease.easeOutElastic, delay = 0) {
+OEntity.prototype.moveTo = function (p, duration, makeStatic, ease = Ease.custom, delay = 0) {
   return this.tweenTo({ position: p, duration, makeStatic, ease, delay });
 };
-OEntity.prototype.moveBy = function (d, duration, makeStatic, ease = Ease.easeOutElastic, delay = 0) {
+OEntity.prototype.moveBy = function (d, duration, makeStatic, ease = Ease.custom, delay = 0) {
   return this.tweenTo({ position: this.position.add(d), duration, makeStatic, ease, delay });
 };
-OEntity.prototype.rotateTo = function (q, duration, makeStatic, ease = Ease.easeOutElastic, delay = 0) {
+OEntity.prototype.rotateTo = function (q, duration, makeStatic, ease = Ease.custom, delay = 0) {
   return this.tweenTo({ rotation: q, duration, makeStatic, ease, delay });
 };
-OEntity.prototype.scaleTo = function (s, duration, makeStatic, ease = Ease.easeOutElastic, delay = 0) {
+OEntity.prototype.scaleTo = function (s, duration, makeStatic, ease = Ease.custom, delay = 0) {
   return this.tweenTo({ scale: s, duration, makeStatic, ease, delay });
 };
-OEntity.prototype.tintTo = function (c, duration, makeStatic, ease = Ease.easeOutElastic, delay = 0) {
+OEntity.prototype.tintTo = function (c, duration, makeStatic, ease = Ease.custom, delay = 0) {
   return this.tweenTo({ color: c, duration, makeStatic, ease, delay });
 };
-OEntity.prototype.scaleZeroTo = function (s, duration, makeStatic, ease = Ease.easeOutElastic, delay = 0) {
+OEntity.prototype.scaleZeroTo = function (s, duration, makeStatic, ease = Ease.custom, delay = 0) {
   this.scale = hz.Vec3.zero;
   return this.tweenTo({ scale: s, duration, makeStatic, ease, delay });
 };

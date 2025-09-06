@@ -5,21 +5,21 @@ import { OPoolManager } from "_OPool";
 
 export class OEntityManager {
     private allList: OEntity[] = [];
-    private simulatedList: OEntity[] = [];
+    private physicsPreSleepTimer: Map<OEntity, number> = new Map();
+    private readonly preSleepDuration = 0.3;
 
-    constructor(private wrapper: OWrapper, private pool: OPoolManager) { }
+    constructor(private wrapper: OWrapper, private pool: OPoolManager) {
+        this.wrapper.onUpdate((dt) => this.update(dt));
+    }
+
+    public hasAvailable(): boolean {
+        return this.pool.count() > 0;
+    }
 
     public create(): OEntity {
         const oEntity = new OEntity(undefined, this.wrapper, this.pool);
         this.allList.push(oEntity);
         return oEntity;
-    }
-
-    public register(oEntity: OEntity) {
-        this.allList.push(oEntity);
-        if (oEntity.isPhysics) {
-            this.simulatedList.push(oEntity);
-        }
     }
 
     public get(entity: hz.Entity): OEntity | undefined {
@@ -32,5 +32,49 @@ export class OEntityManager {
             return dynamicOE;
         }
         return undefined;
+    }
+
+    public delete(oEntity: OEntity) {
+        if (this.allList.includes(oEntity)) {
+            this.allList.slice(this.allList.indexOf(oEntity));
+        }
+    }
+
+    private update(dt: number) {
+        for (const oEntity of this.allList) {
+            this.fallingObject(oEntity);
+            this.sleepPhysics(oEntity, dt);
+        }
+    }
+
+    public fallingObject(oEntity: OEntity) {
+        if (oEntity.position.y < -10) {
+            oEntity.makeInvisible();
+        }
+    }
+
+    public sleepPhysics(oEntity: OEntity, dt: number) {
+        if (oEntity.isPhysics) {
+            if (!this.physicsPreSleepTimer.has(oEntity)) {
+                this.physicsPreSleepTimer.set(oEntity, 0);
+            }
+            const physics = oEntity.entity?.as(hz.PhysicalEntity);
+            if (physics) {
+                const velocity = physics.velocity.get().length()!;
+                let timer = this.physicsPreSleepTimer.get(oEntity)!;
+                if (velocity > 0.1) {
+                    timer = this.preSleepDuration;
+                }
+                if (physics && velocity < 0.1) {
+                    timer += dt;
+                    if (timer > this.preSleepDuration) {
+                        // oEntity.makeStatic();
+                        oEntity.makeInvisible();
+                        this.physicsPreSleepTimer.delete(oEntity);
+                    }
+                }
+                this.physicsPreSleepTimer.set(oEntity, timer);
+            }
+        }
     }
 }

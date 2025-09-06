@@ -32,17 +32,29 @@ export class OisifManager extends hz.Component<typeof OisifManager> {
 
         this.wrapper.component.connectNetworkBroadcastEvent(OEvent.onTerrainSpawn, (payload) => {
             if (this.random.bool(0.3)) {
-                const tree = new TreeBase(this.wrapper, payload.entity.position.get());
+                const tree = new TreeBase(this.wrapper, this.manager, payload.entity.position.get());
             }
         });
         this.wrapper.component.connectNetworkBroadcastEvent(PlayerLocal.onTouch, (payload) => {
-            const oEntity = this.manager.get(payload.hit.target);
-            if (oEntity) {
-                oEntity.makePhysic();
-            }
+            this.onTouch(payload.hit, payload.player);
         });
     }
 
     public start() {}
+
+    private onTouch(hit: hz.EntityRaycastHit, player: hz.Player) {
+        const oEntity = this.manager.get(hit.target);
+        if (oEntity && !oEntity.tags.includes('Terrain')) {
+            if (oEntity.makeDynamic()) {// || oEntity.entity) {
+                oEntity.makePhysic();
+                const physics = oEntity.entity?.as(hz.PhysicalEntity);
+                if (physics) {
+                    const playerPosition = player.position.get();
+                    const direction = hz.Vec3.up;
+                    physics.applyForce(direction.mul(5), hz.PhysicsForceMode.Impulse);
+                }
+            }
+        }
+    }
 }
 hz.Component.register(OisifManager);

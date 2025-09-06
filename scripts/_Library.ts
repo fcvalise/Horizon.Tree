@@ -5,6 +5,7 @@ export class Library {
     public static matter = 615081864813295;
     public static matterStatic = 3936638246649448;
     public static shadow = 1325761702246956;
+    public static cursor = 756320273787757;
 
 
     public static segementStatic = 1061635326176748;

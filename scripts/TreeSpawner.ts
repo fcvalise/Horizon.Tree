@@ -24,7 +24,7 @@ export class TreeSpawner extends hz.Component<typeof TreeSpawner> {
       // this.particle.position.set(position);
       // this.particle.play({ fromStart: true});
       // this.entity.position.set(position);
-      this.tree = new TreeBase(this.wrapper, position, { seed: `${position.x * 21839}` });
+      // this.tree = new TreeBase(this.wrapper, position, { seed: `${position.x * 21839}` });
       // player.applyForce(TMath.vScale(player.forward.get(), -2.5));
       player.showToastMessage("Tree planted", 2000);
   }

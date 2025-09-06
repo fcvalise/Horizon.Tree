@@ -4,14 +4,14 @@ import { BranchSettings, TreeSettings } from "_TreeSettings";
 import { TreeArchitecture } from "_TreeArchitecture";
 import { TreeTropisms } from "_TreeTropisms";
 import { TreeLeaves } from "_TreeLeaves";
-import { TreeEvent } from "_TreeEvent";
-import { OisifManager } from "_OManager";
 import { OEntity } from "_OEntity";
 import { ORandom } from "_ORandom";
 import { ORaycast } from "_ORaycast";
 import { OWrapper } from "_OWrapper";
 import { PlayerLocal } from "_PlayerLocal";
 import { OColor } from "_OColor";
+import { OEntityManager } from "_OEntityManager";
+import { estimateTreeProgressCurrent } from "_TreeProgress";
 
 export type Bud = {
     position: hz.Vec3;
@@ -54,21 +54,19 @@ export class TreeGrowth {
     constructor(
         private position: hz.Vec3,
         private wrapper: OWrapper,
+        private manager: OEntityManager,
         private treeSettings: TreeSettings,
     ) {
-        this.random = new ORandom(treeSettings.seed);
+        this.random = new ORandom(position.x * position.z * position.y);
         this.raycast = new ORaycast(this.wrapper);
         this.architecture = new TreeArchitecture(treeSettings, treeSettings.architecture);
         this.tropisms = new TreeTropisms(this.architecture, treeSettings.tropism, this.raycast, this.random);
-        this.leaves = new TreeLeaves(this.wrapper, treeSettings, treeSettings.leaf, this.random);
+        this.leaves = new TreeLeaves(this.wrapper, this.manager, treeSettings, treeSettings.leaf, this.random);
         this.settings = treeSettings.branch;
 
         this.createRoot();
 
-        this.wrapper.component.connectNetworkBroadcastEvent(TreeEvent.pruneTree, (payload) => {
-            this.prune(payload.entity);
-        });
-            this.wrapper.component.connectNetworkBroadcastEvent(PlayerLocal.onTouch, (payload) => {
+        this.wrapper.component.connectNetworkBroadcastEvent(PlayerLocal.onTouch, (payload) => {
             this.prune(payload.hit.target);
         });
     }
@@ -105,53 +103,43 @@ export class TreeGrowth {
         if (this.growthQueue.length === 0) return;
         if (this.architecture.waitForRythmic(this.frameCount)) return;
         const bud = this.growthQueue.shift()!;
-        if (bud.depth >= this.treeSettings.maxDepth) return;
-        const combined = this.tropisms.getVector(bud);
-        this.createSegment(bud, combined);
-    }
-
-    public async stop() {
-        this.isStopped = true;
-        await this.stopBranch(this.budRoot);
-    }
-
-    public async stopBranch(budRoot: Bud) {
-        for (const bud of budRoot.children) {
-            bud.isPruned = true;
-            // await TreeTween.waitFor(this.component, () => Boolean(bud.created));
-            // for (const entity of budRoot.oEntityList) {
-            //     // await TreePool.I.release(entity);
-            // }
+        if (!bud.isPruned && bud.depth < this.treeSettings.maxDepth) {
+            const combined = this.tropisms.getVector(bud);
+            this.createSegment(bud, combined);
+        } else {
+            this.removeBranch(bud);
         }
-        // TreePool.I.resetAll();
+        const metrics = estimateTreeProgressCurrent(this.budRoot, this.treeSettings.maxDepth);
+        console.log(metrics.progress);
+        
     }
 
     public prune(entity: hz.Entity) {
-        const oEntity = OisifManager.I.manager.get(entity);
+        const oEntity = this.manager.get(entity);
         if (oEntity) {
             const budRoot = this.budMap.get(oEntity);
             if (budRoot) {
                 console.log(JSON.stringify(this.settings));
                 this.removeBranch(budRoot);
-                if (this.settings.growAfterPrune) {
-                    budRoot.children = [];
-                    budRoot.oEntityList = [];
-                    budRoot.isPruned = false;
-                    this.growthQueue.push(budRoot);
-                }
+                // if (this.settings.growAfterPrune) {
+                //     budRoot.isPruned = false;
+                //     this.growthQueue.push(budRoot);
+                // }
             }
         }
     }
 
     private async removeBranch(bud: Bud) {
         bud.isPruned = true;
-        // bud.oEntity?.cancelTweens();
-        // bud.oEntity?.makePhysic();
         for (const oEntity of bud.oEntityList) {
-            oEntity?.cancelTweens();
-            oEntity?.makePhysic();
+            if (oEntity.makeDynamic()) {// || oEntity.entity) {
+                oEntity?.cancelTweens();
+                oEntity?.makePhysic();
+            } else if (!oEntity.isStatic) {
+                oEntity?.cancelTweens();
+                oEntity.makePhysic();
+            }
         }
-        bud.oEntityList = [];
         for (const child of bud.children) {
             this.removeBranch(child);
         }
@@ -169,15 +157,15 @@ export class TreeGrowth {
     }
 
     private async createSegment(bud: Bud, direction: hz.Vec3): Promise<void> {
-        if (this.isPrunedParent(bud)) return;
+        if (bud.isPruned || this.isPrunedParent(bud)) return;
         if (this.raycast.cast(bud.position, this.tropisms.sunDir(), bud.length * 4)) {
             bud.length *= 0.8;
         }
         if (bud.length < this.settings.length * 0.2) return;
         
-        if (OisifManager.I.pool.count() > 0) {
+        if (this.manager.hasAvailable()) {
             if (!bud.oEntity) {
-                bud.oEntity = OisifManager.I.manager.create();
+                bud.oEntity = this.manager.create();
             }
             if (bud.oEntity && bud.oEntity.makeDynamic()) {
                 const nextPosition = bud.position.add(direction.mul(bud.length));
@@ -191,10 +179,10 @@ export class TreeGrowth {
                 bud.oEntity.color = OColor.Black;
                 bud.oEntityList.push(bud.oEntity);
                 this.budMap.set(bud.oEntity, bud);
-                bud.oEntity.scaleZeroTo(bud.oEntity.scale, this.random.range(1, 4))
+                bud.oEntity.setTags(['Branch']);
+                bud.oEntity.scaleZeroTo(bud.oEntity.scale, this.random.range(2, 7))
                 .then(() => {
                     this.leaves.placeLeaves(bud, direction, bud.length);
-
                     this.enqueueSegment(bud, direction, nextPosition);
                 });
             }

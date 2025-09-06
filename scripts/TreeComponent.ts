@@ -11,9 +11,9 @@ class TreeComponent extends hz.Component<typeof TreeComponent> {
   private tree!: TreeBase;
 
   start() {
-    const position = this.entity.position.get();
-    this.wrapper = new OWrapper(this);
-    this.tree = new TreeBase(this.wrapper, position, { seed: this.props.seed });
+    // const position = this.entity.position.get();
+    // this.wrapper = new OWrapper(this);
+    // this.tree = new TreeBase(this.wrapper, position, { seed: this.props.seed });
   }
 }
 hz.Component.register(TreeComponent);

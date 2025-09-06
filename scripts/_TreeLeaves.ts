@@ -1,14 +1,15 @@
 import * as hz from "horizon/core";
-import { OisifManager } from "_OManager";
 import { ORandom } from "_ORandom";
 import { OWrapper } from "_OWrapper";
 import { Bud } from "_TreeGrowth";
 import { LeafSettings, TreeSettings } from "_TreeSettings";
 import { OColor } from "_OColor";
+import { OEntityManager } from "_OEntityManager";
 
 export class TreeLeaves {
     constructor(
         private wrapper: OWrapper,
+        private manager: OEntityManager,
         private treeSettings: TreeSettings,
         private settings: LeafSettings,
         private random: ORandom
@@ -16,8 +17,8 @@ export class TreeLeaves {
     }
 
     private async placeAt(bud: Bud, nodeOrigin: hz.Vec3, phiDeg: number, side: hz.Vec3, forward: hz.Vec3): Promise<void> {
-        if (OisifManager.I.pool.count() > 0) {
-            const oEntity = OisifManager.I.manager.create();
+        if (this.manager.hasAvailable()) {
+            const oEntity = this.manager.create();
             if (oEntity.makeDynamic()) {
                 const radial = side.rotateArround(phiDeg, forward);
                 const rightX = hz.Vec3.cross(forward, radial).normalize();
@@ -26,8 +27,9 @@ export class TreeLeaves {
                 oEntity.rotation = hz.Quaternion.lookRotation(radial, upY);
                 oEntity.scale = hz.Vec3.one.mul(this.settings.scale);
                 oEntity.color = OColor.LightGreen;
-                oEntity.scaleZeroTo(oEntity.scale, this.random.range(1, 4))
                 bud.oEntityList?.push(oEntity);
+                oEntity.setTags(['Leaf'])
+                oEntity.scaleZeroTo(oEntity.scale, this.random.range(1, 4));
             }
         } else {
             this.placeAt(bud, nodeOrigin, phiDeg, side, forward);

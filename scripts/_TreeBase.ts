@@ -5,7 +5,8 @@ import { OWrapper } from "_OWrapper";
 import { TreeSettings } from "_TreeSettings";
 import { TreeGrowth } from "_TreeGrowth";
 import { ORaycast } from "_ORaycast";
-import { OEntity } from "_OEntity";
+import { OEntityManager } from "_OEntityManager";
+import { ORandom } from "_ORandom";
 
 const DefaultSettings: TreeSettings = {
     seed: 'MyTree',
@@ -68,14 +69,18 @@ export class TreeBase {
 
     constructor(
         private wrapper: OWrapper,
+        private manager: OEntityManager,
         position: hz.Vec3,
         overrides?: Partial<TreeSettings>
     ) {
+        const random = new ORandom(position.x * position.z * position.y);
         // this.settings = mergeSettings(DefaultSettings, this.getRandomSettings(position));
         this.settings = cloneSettings(DefaultSettings);
-        this.settings.branch.length = 1 + Math.random() * 3;
+        this.settings.branch.length = random.range(1, 4);
+        this.settings.branch.bottomWidth = random.range(0.4, 0.7);
+        this.settings.leaf.scale = random.range(1.2, 2);
         this.addShadow(position);
-        this.growth = new TreeGrowth(position, wrapper, this.settings);
+        this.growth = new TreeGrowth(position, wrapper, manager, this.settings);
         this.wrapper.onUpdateUntil(() => this.growth.step(), () => !this.isGrowing);
 
         // this.component.connectNetworkBroadcastEvent(TreeEvent.spawnTreeDescription, (payload) => {

@@ -27,8 +27,6 @@ export class OTerrain {
     private readonly discoverRange = 10;
     private readonly maxDistance = 25; 
     private cellArray: Cell[] = [];
-    private melody!: OMelody;
-    private melodyIndex = 0;
     
     constructor(
         private wrapper: OWrapper,
@@ -39,17 +37,6 @@ export class OTerrain {
     ) {
         this.create();
         wrapper.onUpdate(() => this.update());
-        this.melody = new OMelody(wrapper);
-        // mellow pentatonic minor in A, lower band
-        // this.melody.useScale("pentMin").useKey("A").setOctaves(-1, 0);
-        // bright major in D across two octaves
-        this.melody.useScale("major").useKey("D").setOctaves(0, 2);
-        // Japanese color (Hirajoshi), slower tempo
-        // this.melody.useScale("hirajoshi").useKey("C").setOctaves(0, 1).setTempo(110);
-        // Whole-tone sci-fi sweeps
-        // this.melody.useScale("wholeTone").useKey("C").setOctaves(0, 1);
-
-
     }
 
     private update() {
@@ -64,22 +51,24 @@ export class OTerrain {
                 cell.oEntity.rotation = cell.rotation;
                 if (cell.oEntity.makeDynamic()) {
                     cell.discovered = true;
-                    this.melody.trigger(cell.position, this.melodyIndex++);
+                    cell.oEntity.setTags(['Terrain']);
                     cell.oEntity.scaleZeroTo(cell.scale, 0.8)
                     .then(() => {
                         this.wrapper.component.sendNetworkBroadcastEvent(OEvent.onTerrainSpawn, { entity: cell.oEntity?.entity! });
                     });
                 }
-            } else if (!cell.discovered && !cell.instanciated) {
-                cell.oEntity.position = cell.position;
-                cell.oEntity.rotation = cell.rotation;
-                cell.oEntity.scale = cell.scale;
-                cell.oEntity.color = OColor.Grey;
-                if (cell.oEntity.makeDynamic()) {
-                    cell.instanciated = true;
-                    cell.oEntity.scaleZeroTo(cell.oEntity.scale, 0.8)
-                }
             }
+            //  else if (!cell.discovered && !cell.instanciated) {
+            //     cell.oEntity.position = cell.position;
+            //     cell.oEntity.rotation = cell.rotation;
+            //     cell.oEntity.scale = cell.scale;
+            //     cell.oEntity.color = OColor.Grey;
+            //     if (cell.oEntity.makeDynamic()) {
+            //         cell.instanciated = true;
+            //         cell.oEntity.setTags(['Terrain']);
+            //         cell.oEntity.scaleZeroTo(cell.oEntity.scale, 0.8)
+            //     }
+            // }
         }
         this.updateUI();
     }

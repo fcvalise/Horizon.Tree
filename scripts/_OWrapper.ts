@@ -43,4 +43,14 @@ export class OWrapper {
         console.warn('On player enter shortcut in wrapper is untested');
         return () => { try { sub.disconnect?.(); } catch {} };
     }
+
+    public waitFrames(frames: number = 1): Promise<void> {
+        return new Promise(res => {
+            let left = frames;
+            this.onUpdateUntil(
+                () => { if (--left <= 0) res(); },
+                () => false // never cancel
+            );
+        });
+    }
 }
