@@ -109,9 +109,8 @@ export class TreeGrowth {
         } else {
             this.removeBranch(bud);
         }
-        const metrics = estimateTreeProgressCurrent(this.budRoot, this.treeSettings.maxDepth);
-        console.log(metrics.progress);
-        
+        // const metrics = estimateTreeProgressCurrent(this.budRoot, this.treeSettings.maxDepth);
+        // console.log(metrics.progress);   
     }
 
     public prune(entity: hz.Entity) {

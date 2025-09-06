@@ -2,6 +2,8 @@ import * as hz from "horizon/core";
 
 export {}
 
+
+// Number
 declare global {
   interface NumberConstructor {
     lerp(a: number, b: number, t: number): number;
@@ -32,6 +34,8 @@ Number.prototype.clamp01 = function (): number {
   return v;
 };
 
+
+// Vec3
 declare module "horizon/core" {
   interface Vec3 {
     angle(axis?: hz.Vec3): number;
@@ -69,6 +73,8 @@ hz.Vec3.prototype.length2 = function(): number {
   return v.x * v.x + v.y * v.y + v.z * v.z;
 }
 
+
+// Quaternion
 declare module "horizon/core" {
   interface Quaternion {
     rotateVec3(v: hz.Vec3): hz.Vec3;
@@ -113,3 +119,22 @@ Object.defineProperty(hz.Quaternion.prototype, "up", {
     return this.rotateVec3(hz.Vec3.up);
   }
 });
+
+declare module 'horizon/core' {
+  interface Color {
+    lerp(to: hz.Color, t: number): hz.Color;
+  }
+  namespace Color {
+    function lerp(a: hz.Color, b: hz.Color, t: number): hz.Color;
+  }
+}
+
+hz.Color.lerp = function(a: hz.Color, b: hz.Color, t: number): hz.Color {
+  const ar = a.r, ag = a.g, ab = a.b;
+  const br = b.r, bg = b.g, bb = b.b;
+  return new hz.Color(
+    ar + (br - ar) * t,
+    ag + (bg - ag) * t,
+    ab + (bb - ab) * t,
+  );
+};

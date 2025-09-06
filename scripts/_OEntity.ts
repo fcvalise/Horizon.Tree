@@ -49,7 +49,7 @@ export class OEntity {
       this.cancelTweens();
       this.entity.simulated.set(true);
       this.updatePhysics();
-      this.color = OColor.Orange;
+      // this.color = OColor.Orange;
       this.timestamp = Date.now();
       return true;
     }
@@ -94,7 +94,7 @@ export class OEntity {
   private getStatic(needDynamic: boolean): boolean {
     if (!this.staticProxy && this.isReady && (this.entity || !needDynamic)) {
       this.isReady = false;
-      this.oColor = OColor.White;
+      // this.oColor = OColor.White;
       const id = Library.colorMap.get(this.oColor)!;
       const asset = new hz.Asset(BigInt(id));
       const position = this.oPosition.add(this.oRotation.forward.mul(-0.01))
@@ -109,7 +109,7 @@ export class OEntity {
           this.deleteStatic();
         } else {
           this.deleteDynamic();
-          this.oColor = OColor.Grey;
+          // this.oColor = OColor.Grey;
         }
       });
       return true;

@@ -47,12 +47,13 @@ export class OTerrain {
             } else if (!cell.discovered && distance < this.discoverRange) {
                 cell.oEntity.scale = cell.scale;
                 cell.oEntity.color = cell.color;
-                cell.oEntity.position = cell.position;
+                cell.oEntity.position = cell.position.add(hz.Vec3.up.mul(-5));
                 cell.oEntity.rotation = cell.rotation;
                 if (cell.oEntity.makeDynamic()) {
                     cell.discovered = true;
                     cell.oEntity.setTags(['Terrain']);
-                    cell.oEntity.scaleZeroTo(cell.scale, 0.8)
+                    cell.oEntity.moveTo(cell.position, 0.8)
+                    // cell.oEntity.scaleZeroTo(cell.scale, 0.8)
                     .then(() => {
                         this.wrapper.component.sendNetworkBroadcastEvent(OEvent.onTerrainSpawn, { entity: cell.oEntity?.entity! });
                     });

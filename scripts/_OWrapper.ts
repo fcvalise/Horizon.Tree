@@ -40,7 +40,6 @@ export class OWrapper {
         const sub = this.component.connectCodeBlockEvent(this.component.entity, hz.CodeBlockEvents.OnPlayerEnterWorld,
             (player: hz.Player) => { cb(player); });
         this.subscriptions.push(sub);
-        console.warn('On player enter shortcut in wrapper is untested');
         return () => { try { sub.disconnect?.(); } catch {} };
     }
 

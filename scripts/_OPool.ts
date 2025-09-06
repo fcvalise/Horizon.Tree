@@ -49,10 +49,20 @@ export class OPoolManager {
         }
         entity.simulated.set(false);
         await OUtils.waitFor(this.wrapper, () => !entity.simulated.get());
+        // await this.setOwner(entity);
         this.availableCount++;
         entity.tags.set([]);
         this.updateUI();
     }
+
+    // private async setOwner(entity: hz.Entity) {
+    //     const server = this.wrapper.world.getServerPlayer();
+    //     if (entity.owner.get() == server) {
+    //         const oisif = this.wrapper.world.getPlayers().find(p => p.name.get() == "OisifGames")!;
+    //         entity.owner.set(oisif);
+    //         await OUtils.waitFor(this.wrapper, () => entity.owner.get() != server);
+    //     }
+    // }
 
     private async getReserve() {
         const reserve = this.wrapper.world.getEntitiesWithTags(['PoolReserve'])[0];
