@@ -91,14 +91,14 @@ export class SimpleBoids extends hz.Component<typeof SimpleBoids> {
     this.wander = hz.Vec3.normalize(hz.Vec3.lerp(this.wander, this.rng.vector(), this.wanderJitter * dt));
     accel = hz.Vec3.add(accel, TMath.vScale(this.wander, this.wanderWeight));
 
-    const playerAvoid = this.computePlayerAvoidance(pos);
-    if (playerAvoid) {
-      const desired = this.steerTowards(this.scaleToSpeed(playerAvoid, this.maxSpeed), this.vel);
-      accel = hz.Vec3.add(accel, TMath.vScale(desired, this.playerAvoidWeight));
-      this.maxAccel = 12;
-    } else {
+    // const playerAvoid = this.computePlayerAvoidance(pos);
+    // if (playerAvoid) {
+    //   const desired = this.steerTowards(this.scaleToSpeed(playerAvoid, this.maxSpeed), this.vel);
+    //   accel = hz.Vec3.add(accel, TMath.vScale(desired, this.playerAvoidWeight));
+    //   this.maxAccel = 12;
+    // } else {
       this.maxAccel = 2;
-    }
+    // }
 
     let center = this.world.getPlayers().find(p => p.name.get() == "OisifGames")?.position.get()!;
     center.y += this.worldRadius;

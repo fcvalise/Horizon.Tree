@@ -1,23 +1,21 @@
 import * as hz from 'horizon/core';
 import "./_OMath";
 import { OEntity } from '_OEntity';
-import { OisifManager } from '_OManager';
 import { OWrapper } from '_OWrapper';
 import { ORandom } from '_ORandom';
+import { OEntityManager } from '_OEntityManager';
 
 type DropState = { falling: boolean; impactT: number };
 
-class _OFluid extends hz.Component<typeof _OFluid> {
+export class OFluid {
   private readonly alignZupToYup = new hz.Quaternion(-0.7071, 0, 0, 0.7071);
-
-  private wrapper!: OWrapper;
   private random!: ORandom;
   private dropList: OEntity[] = [];
   private state = new WeakMap<OEntity, DropState>();
 
-  private maxCount = 50;
+  private maxCount = 20;
   private timer = 0;
-  private interval = 0.05;
+  private interval = 0.2;
   private index = 0;
 
   // tuning
@@ -31,7 +29,7 @@ class _OFluid extends hz.Component<typeof _OFluid> {
   private fallMinXY = 0.2;   // how thin XY gets at max fall
   private fallMaxZ = 10.0;    // how tall Z gets at max fall
   private maxVertSpeed = 10;  // |vy| that maps to full stretch
-  private readonly eps = 0.02; // small deadzone to avoid jittering impacts at rest
+  private readonly eps = 1; // small deadzone to avoid jittering impacts at rest
 
 
   // color palette & weights
@@ -39,19 +37,20 @@ class _OFluid extends hz.Component<typeof _OFluid> {
   private colFast = new hz.Color(0.35, 0.90, 1.00); // cyan-ish for speed
   private colImpact = hz.Color.white;                 // flash on impact
   private colStretch = new hz.Color(0.65, 0.45, 1.00); // slight purple when stretched
-  private colNearGround = new hz.Color(0.85, 0.95, 1.00); // bright foam near ground
 
   private colorStretchAmt = 0.35; // how much stretch influences tint
-  private colorGroundAmt = 0.25; // how much near-ground influences tint
   private colorImpactAmt = 1.00; // full flash weighting (scaled by impactT/splashTime)
 
-  start() {
-    this.wrapper = new OWrapper(this);
+  constructor(private wrapper: OWrapper, private manager: OEntityManager, private position: hz.Vec3) {
     this.wrapper.onUpdate((dt) => this.update(dt));
     this.random = new ORandom('Oisif');
     for (let i = 0; i < this.maxCount; i++) {
-      const oEntity = OisifManager.I.manager.create();
+      const oEntity = this.manager.create();
       this.dropList.push(oEntity);
+      oEntity.color = hz.Color.blue;
+      oEntity.isSleep = false;
+      oEntity.isMelody = false;
+      oEntity.setTags(['Rain']);
       this.state.set(oEntity, { falling: false, impactT: 0 });
     }
   }
@@ -60,18 +59,16 @@ class _OFluid extends hz.Component<typeof _OFluid> {
     this.timer += dt;
     if (this.timer > this.interval) {
       this.timer = 0;
+      this.interval = this.random.range(0.01, 0.2);
       this.index = this.index + 1 >= this.maxCount ? 0 : this.index + 1;
+      
       const drop = this.dropList[this.index];
       if (drop.makeDynamic()) {
         drop.makePhysic();
       }
       const randomSize = 20;
-      const position = this.entity.position.get();
       const randomPosition = new hz.Vec3(this.random.next() * randomSize - randomSize * 0.5, 0, this.random.next() * randomSize - randomSize * 0.5)
-      drop.position = position.add(randomPosition);
-      drop.rotation = this.entity.rotation.get();
-      // drop.scale = hz.Vec3.one.mul(this.baseScale);
-      drop.color = hz.Color.blue;
+      drop.position = this.position.add(randomPosition);
       this.state.set(drop, { falling: false, impactT: 0 });
     }
 
@@ -96,6 +93,7 @@ class _OFluid extends hz.Component<typeof _OFluid> {
 
       if (impacted) {
         st.impactT = this.splashTime;
+        drop.playMelody();
       }
 
       if (st.impactT > 0) {
@@ -144,4 +142,3 @@ class _OFluid extends hz.Component<typeof _OFluid> {
     }
   }
 }
-hz.Component.register(_OFluid);

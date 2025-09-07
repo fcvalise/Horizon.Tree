@@ -20,7 +20,7 @@ export class UIBarController extends hz.Component<typeof UIBarController> {
 
   public updateValue(percent: number, text: string) {
     const clampedValue = Math.max(0, Math.min(1, percent));
-    const newScale = new hz.Vec3(clampedValue, 1, 1);
+    const newScale = new hz.Vec3(1, 1, clampedValue);
     this.props.fill?.scale.set(newScale);
     this.props.text?.as(hz.TextGizmo)!.text.set(text);
   }

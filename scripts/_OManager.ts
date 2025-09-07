@@ -8,9 +8,13 @@ import { OTerrain } from "_OTerrain";
 import { OEvent } from "_OEvent";
 import { PlayerLocal } from "_PlayerLocal";
 import { TreeBase } from "_TreeBase";
+import { OFluid } from "_OFluid";
+import { TreeEvent } from "_TreeEvent";
+import { UpdateUIBar } from "UIBarController";
+import { Pressable } from "horizon/ui";
 
-export class OisifManager extends hz.Component<typeof OisifManager> {
-    public static I: OisifManager; // TODO : Should be removed
+export class OisifManager {
+    // public static I: OisifManager; // TODO : Should be removed
 
     private wrapper!: OWrapper;
     public pool!: OPoolManager;
@@ -19,16 +23,22 @@ export class OisifManager extends hz.Component<typeof OisifManager> {
 
     private cloud!: OClouds;
     private terrain!: OTerrain;
+    private fuild!: OFluid;
     
-    public preStart() {
-        OisifManager.I = this;
-        this.random = new ORandom('Oisif');
-        this.wrapper = new OWrapper(this);
+    public constructor(component: hz.Component) {
+        // OisifManager.I = this;
+        this.random = new ORandom('Oisiff');
+        this.wrapper = new OWrapper(component);
         this.pool = new OPoolManager(this.wrapper);
         this.manager = new OEntityManager(this.wrapper, this.pool);
 
         this.cloud = new OClouds(this.wrapper, this.pool, this.random);
         this.terrain = new OTerrain(this.wrapper, this.manager, this.random, 40, 4);
+        this.wrapper.component.connectNetworkBroadcastEvent(UpdateUIBar, (payload) => {
+            if (payload.id == 'Discovered' && payload.percent == 1 && !this.fuild) {
+                this.fuild = new OFluid(this.wrapper, this.manager, new hz.Vec3(0, 10, 0));
+            }
+        })
 
         this.wrapper.component.connectNetworkBroadcastEvent(OEvent.onTerrainSpawn, (payload) => {
             if (this.random.bool(0.3)) {
@@ -57,4 +67,3 @@ export class OisifManager extends hz.Component<typeof OisifManager> {
         }
     }
 }
-hz.Component.register(OisifManager);

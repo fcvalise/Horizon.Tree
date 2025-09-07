@@ -54,7 +54,7 @@ export class OEntityManager {
     }
 
     public sleepPhysics(oEntity: OEntity, dt: number) {
-        if (oEntity.isPhysics) {
+        if (oEntity.isPhysics && oEntity.isSleep) {
             if (!this.physicsPreSleepTimer.has(oEntity)) {
                 this.physicsPreSleepTimer.set(oEntity, 0);
             }
@@ -70,6 +70,7 @@ export class OEntityManager {
                     if (timer > this.preSleepDuration) {
                         // oEntity.makeStatic();
                         oEntity.makeInvisible();
+                        oEntity.playMelody();
                         this.physicsPreSleepTimer.delete(oEntity);
                     }
                 }

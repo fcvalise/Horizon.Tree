@@ -9,7 +9,7 @@ class Computer extends hz.Component<typeof Computer> {
     this.wrapper.onPlayerEnter((player) => {
       console.log(`Player ${player.name.get()} entered`);
       const attachable = this.entity.as(hz.AttachableEntity)
-      attachable.attachToPlayer(player, hz.AttachablePlayerAnchor.Head);
+      // attachable.attachToPlayer(player, hz.AttachablePlayerAnchor.Head);
     });
   }
 }

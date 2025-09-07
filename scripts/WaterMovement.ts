@@ -1,4 +1,5 @@
 import { OisifManager } from '_OManager';
+import { ORandom } from '_ORandom';
 import { OWrapper } from '_OWrapper';
 import * as hz from 'horizon/core';
 
@@ -7,6 +8,7 @@ const DEG = (r:number)=> r*180/Math.PI;
 
 class WaterMovement extends hz.Component<typeof WaterMovement> {
   private wrapper!: OWrapper;
+  private random!: ORandom;
   private t = 0;
   private originPos!: hz.Vec3;
   private baseRot!: hz.Quaternion;
@@ -26,13 +28,14 @@ class WaterMovement extends hz.Component<typeof WaterMovement> {
 
   start() {
     this.wrapper = new OWrapper(this);
+    this.random = new ORandom('Oisif');
     this.wrapper.onUpdate((dt) => this.update(dt));
 
     this.originPos = this.entity.position.get();
     // Plane horizontal in your setup (X=270°). Keep current yaw so coastline alignment stays stable.
     const current = this.entity.rotation.get();
     this.baseRot = current ?? hz.Quaternion.fromEuler(new hz.Vec3(0, 0, 0));
-    this.t = OisifManager.I.random.range(0, 10)
+    this.t = this.random.range(0, 10)
   }
 
   private update(dt: number) {

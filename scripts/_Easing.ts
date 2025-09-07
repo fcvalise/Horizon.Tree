@@ -32,7 +32,9 @@ export class Easing {
 	}
 
 	public static fastInBumpOut(t: number) {
-		return Easing.createCubicBezier(0, 0, 0.85, 0.09, 0.819, 1.239, 1, 1)(t);
+		return Easing.createCubicBezier(0, 0,
+			0, 0.862, 1, 0.689,
+			1, 1)(t);
 	}
 
 	public static lerpClamped(a: number, b: number, t: number): number {

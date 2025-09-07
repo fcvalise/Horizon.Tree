@@ -10,7 +10,7 @@ import { ORandom } from "_ORandom";
 
 const DefaultSettings: TreeSettings = {
     seed: 'MyTree',
-    maxDepth: 5,
+    maxDepth: 4,
     branch: {
         initialCount: 1,
         length: 1.9,

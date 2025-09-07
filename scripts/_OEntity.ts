@@ -11,6 +11,8 @@ export class OEntity {
   private static melody: OMelody | undefined = undefined;
   private static trail: OTrail | undefined = undefined; // TODO : Use trail
 
+  public staticProxy: hz.Entity | undefined;
+
   private oPosition: hz.Vec3 = hz.Vec3.zero;
   private oRotation: hz.Quaternion = hz.Quaternion.zero;
   private oScale: hz.Vec3 = hz.Vec3.zero;
@@ -22,10 +24,12 @@ export class OEntity {
   private syncScale: boolean = true;
   private syncColor: boolean = true;
 
-  public staticProxy: hz.Entity | undefined;
   private isReady: boolean = true;
   private timestamp: number = Date.now();
+
   public tags: string[] = [];
+  public isSleep = true;
+  public isMelody = true;
 
   constructor(
     public entity: hz.Entity | undefined,
@@ -35,7 +39,7 @@ export class OEntity {
 
   public makeDynamic(): boolean {
     if (this.getDynamic()) {
-      this.playMelody();
+      if (this.isMelody) this.playMelody();
       this.cancelTweens();
       this.deleteStatic();
       return true;
@@ -45,7 +49,7 @@ export class OEntity {
 
   public makePhysic(): boolean {
     if (this.entity) {
-      this.playMelody();
+      // this.playMelody();
       this.cancelTweens();
       this.entity.simulated.set(true);
       this.updatePhysics();
@@ -144,17 +148,17 @@ export class OEntity {
     this.tags = tags;
   }
 
-  private playMelody() {
+  public playMelody() {
     if (!OEntity.melody) {
       OEntity.melody = new OMelody(this.wrapper, "Note")
-        .useScale("mixolydian")
+        .useScale("dorian")
         .useKey("D")
         .setOctaves(0, 2)
         .setQuantize(true, { bpm: 300, maxPerTick: 12 });
     }
-    // just pass position + your own tags; OMelody does the rest
-    OEntity.melody.triggerWithTags(this.position.mul(1), this.tags);
-    OEntity.melody.setObjectCount((this.pool.staticCount + this.pool.count()) * 0.1);
+    this.wrapper.component.async.setTimeout(() => {
+      OEntity.melody?.triggerWithTags(this.oPosition, this.tags);
+    }, 30)
   }
 
   public sync() {
@@ -193,7 +197,8 @@ const Ease = {
   easeOutBounce: (t:number) => Easing.easeOutBounce(t),
   easeOutElastic: (t:number) => Easing.easeOutElastic(t),
   easeOutBack: (t:number) => Easing.easeOutBack(t),
-  custom: (t:number) => Easing.fastInBumpOut(t),
+  // custom: (t:number) => Easing.fastInBumpOut(t),
+  custom: (t:number) => Easing.easeOutElastic(t),
 } as const;
 
 // --- HELPERS ---

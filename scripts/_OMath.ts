@@ -77,6 +77,7 @@ hz.Vec3.prototype.length2 = function(): number {
 // Quaternion
 declare module "horizon/core" {
   interface Quaternion {
+    angleTo(b: hz.Quaternion): number;
     rotateVec3(v: hz.Vec3): hz.Vec3;
     forward: hz.Vec3;
     right: hz.Vec3;
@@ -84,8 +85,14 @@ declare module "horizon/core" {
   }
 }
 
-// rotate any vector by a quaternion
-(hz.Quaternion.prototype as any).rotateVec3 = function(v: hz.Vec3): hz.Vec3 {
+hz.Quaternion.prototype.angleTo = function(b: hz.Quaternion): number {
+  const a = this as hz.Quaternion;
+  const dot = Math.abs(a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w);
+  const clamped = Math.min(1, Math.max(-1, dot));
+  return 2 * Math.acos(clamped);
+}
+
+hz.Quaternion.prototype.rotateVec3 = function(v: hz.Vec3): hz.Vec3 {
   const q = this as hz.Quaternion;
   const x = v.x, y = v.y, z = v.z;
   const qx = q.x, qy = q.y, qz = q.z, qw = q.w;
