@@ -3,7 +3,7 @@ import { Color } from "horizon/core";
 
 export class OColor {
     public static readonly LightGreen = new Color(0.8, 0.94, 0.1);
-    public static readonly DarkGreen = new Color(0.31, 0.87, 0.07);
+    public static readonly DarkGreen = new Color(0.45, 0.65, 0.07);
     public static readonly Orange = new Color(0.84, 0.56, 0.09);
     public static readonly Black = new Color(0.01, 0.01, 0.01);
     public static readonly White = new Color(0.95, 0.87, 0.93);

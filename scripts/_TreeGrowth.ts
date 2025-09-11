@@ -12,6 +12,7 @@ import { PlayerLocal } from "_PlayerLocal";
 import { OColor } from "_OColor";
 import { OEntityManager } from "_OEntityManager";
 import { estimateTreeProgressCurrent } from "_TreeProgress";
+import { InteractableRegistry } from "_OTrigger";
 
 export type Bud = {
     position: hz.Vec3;
@@ -132,12 +133,14 @@ export class TreeGrowth {
         bud.isPruned = true;
         for (const oEntity of bud.oEntityList) {
             if (oEntity.makeDynamic()) {// || oEntity.entity) {
-                oEntity?.cancelTweens();
-                oEntity?.makePhysic();
+                oEntity.cancelTweens();
+                oEntity.makePhysic();
+
             } else if (!oEntity.isStatic) {
-                oEntity?.cancelTweens();
+                oEntity.cancelTweens();
                 oEntity.makePhysic();
             }
+            oEntity.isCollectible = true;
         }
         for (const child of bud.children) {
             this.removeBranch(child);
@@ -181,9 +184,16 @@ export class TreeGrowth {
                 bud.oEntity.setTags(['Branch']);
                 bud.oEntity.scaleZeroTo(bud.oEntity.scale, this.random.range(2, 7))
                 .then(() => {
-                    this.leaves.placeLeaves(bud, direction, bud.length);
+                    this.leaves.placeLeaves(bud, direction);
                     this.enqueueSegment(bud, direction, nextPosition);
                 });
+
+                if (bud === this.budRoot) {
+                    const dispose = InteractableRegistry.I.addInline(this.budRoot.oEntity!, (player) => {
+                        this.prune(this.budRoot.oEntity?.entity ?? this.budRoot.oEntity?.staticProxy!);
+                        dispose();
+                    });
+                }
             }
         } else {
             this.growthQueue.push(bud);

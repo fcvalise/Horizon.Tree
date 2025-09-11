@@ -4,9 +4,10 @@ import { OWrapper } from "_OWrapper";
 import { OPoolManager } from "_OPool";
 
 export class OEntityManager {
-    private allList: OEntity[] = [];
+    public allList: OEntity[] = []; // TODO : Should be back to private
     private physicsPreSleepTimer: Map<OEntity, number> = new Map();
     private readonly preSleepDuration = 0.3;
+    public sleepList: OEntity[] = [];
 
     constructor(private wrapper: OWrapper, private pool: OPoolManager) {
         this.wrapper.onUpdate((dt) => this.update(dt));
@@ -43,7 +44,7 @@ export class OEntityManager {
     private update(dt: number) {
         for (const oEntity of this.allList) {
             this.fallingObject(oEntity);
-            this.sleepPhysics(oEntity, dt);
+            // this.sleepPhysics(oEntity, dt);
         }
     }
 
@@ -54,13 +55,13 @@ export class OEntityManager {
     }
 
     public sleepPhysics(oEntity: OEntity, dt: number) {
-        if (oEntity.isPhysics && oEntity.isSleep) {
+        if (oEntity.isPhysics && oEntity.isAutoSleep) {
             if (!this.physicsPreSleepTimer.has(oEntity)) {
                 this.physicsPreSleepTimer.set(oEntity, 0);
             }
             const physics = oEntity.entity?.as(hz.PhysicalEntity);
             if (physics) {
-                const velocity = physics.velocity.get().length()!;
+                const velocity = physics.velocity.get().length()!; // TODO : Probably the accessor is expensive
                 let timer = this.physicsPreSleepTimer.get(oEntity)!;
                 if (velocity > 0.1) {
                     timer = this.preSleepDuration;
@@ -69,9 +70,10 @@ export class OEntityManager {
                     timer += dt;
                     if (timer > this.preSleepDuration) {
                         // oEntity.makeStatic();
-                        oEntity.makeInvisible();
+                        // oEntity.makeInvisible();
                         oEntity.playMelody();
                         this.physicsPreSleepTimer.delete(oEntity);
+                        this.sleepList.push(oEntity);
                     }
                 }
                 this.physicsPreSleepTimer.set(oEntity, timer);

@@ -11,7 +11,7 @@ class CameraAim {
     private rotation = hz.Quaternion.zero;
     private yaw = 0;
     private pitch = 0;
-    
+
     constructor(
         private sensitivity = 0.01,
         private minPitch = -Math.PI * 0.49,
@@ -24,7 +24,7 @@ class CameraAim {
         this.pitch = 0;
     }
 
-    public getOriginRotation() : hz.Quaternion {
+    public getOriginRotation(): hz.Quaternion {
         return this.rotation;
     }
 
@@ -49,47 +49,36 @@ export class OMobileController {
     private gestures!: Gestures;
     private focus!: OFocus;
     private cursor!: OCursor;
-    private aim = new CameraAim(1);
+    private aim = new CameraAim(2.5);
+    private enablePan: boolean = false;
+    private cameraInput!: hz.PlayerInput;
+    private backInput!: hz.PlayerInput;
 
     constructor(private wrapper: OWrapper, private player: hz.Player) {//, private cursor: hz.Entity) {
         this.cursor = new OCursor(wrapper, player);
         this.gestures = new Gestures(this.wrapper.component);
         this.focus = new OFocus(this.wrapper, this.player)
+        this.initializeCamera();
+        this.registerCameraInput();
+        this.registerPan();
+        this.registerTouch();
+        this.registerExit();
+    }
+
+    private initializeCamera() {
         // this.player.focusedInteraction.setTapOptions();
         // this.player.focusedInteraction.setTrailOptions();
-        LocalCamera.collisionEnabled.set(false)
+        LocalCamera.collisionEnabled.set(false);
+        LocalCamera.setCameraModePan({ positionOffset: new hz.Vec3(10, 10, 0) });
+    }
 
-        if (hz.PlayerControls.isInputActionSupported(hz.PlayerInputAction.RightSecondary)) {
-            const leftPrimaryInput = hz.PlayerControls.connectLocalInput(
-                hz.PlayerInputAction.RightSecondary,
-                hz.ButtonIcon.Ability,
-                this.wrapper.component,
-                { preferredButtonPlacement: hz.ButtonPlacement.Default },
-            );
-            leftPrimaryInput.registerCallback((action, pressed) => {
-                if (pressed) {
-                    if (!this.focus.isEnabled()) this.focus.enter();
-                    else this.focus.exit();
-                }
-            });
-        }
-
-        this.focus.onInputStarted((info) => {
-            const raycast = this.wrapper.entity.children.get()[0].as(hz.RaycastGizmo);
-            this.focus.castFromInteractions([info], raycast, (hit) => {
-                if (this.cursor.getSelected() == hit.target) {
-                    this.wrapper.component.sendNetworkBroadcastEvent(PlayerLocal.onTouch, { hit, player: this.player });
-                    this.cursor.clearSelected();
-                } else {
-                    this.cursor.select(hit.target);
-                }
-            });
-        });
-
+    private registerExit() {
         this.focus.onFocusExited((player) => {
             LocalCamera.setCameraModePan({ positionOffset: new hz.Vec3(10, 10, 0) });
         });
+    }
 
+    private registerPan() {
         this.wrapper.onUpdate(() => {
             if (LocalCamera.currentMode.get() != CameraMode.Fixed) {
                 this.aim.setOriginRotation(LocalCamera.rotation.get())
@@ -104,7 +93,7 @@ export class OMobileController {
             //     this.leftSideExit();
             // }
         });
-        
+
         // this.gestures.onTap.connectLocalEvent(({ touches }) => {
         //     const touchX = touches[0].current.screenPosition.x
         //     if (touchX < 0.25) {
@@ -113,19 +102,85 @@ export class OMobileController {
         // });
     }
 
+    private registerTouch() {
+        this.focus.onInputStarted((info) => {
+            const raycast = this.wrapper.entity.children.get()[0].as(hz.RaycastGizmo);
+            this.focus.castFromInteractions([info], raycast, (hit) => {
+                if (this.cursor.getSelected() == hit.target) {
+                    this.wrapper.component.sendNetworkBroadcastEvent(PlayerLocal.onTouch, { hit, player: this.player });
+                    this.cursor.clearSelected();
+                } else {
+                    this.cursor.select(hit.target);
+                }
+            });
+        });
+    }
+
+    private registerCameraInput() {
+        if (hz.PlayerControls.isInputActionSupported(hz.PlayerInputAction.RightSecondary)) {
+            this.cameraInput = hz.PlayerControls.connectLocalInput(
+                hz.PlayerInputAction.RightSecondary,
+                hz.ButtonIcon.Inspect,
+                this.wrapper.component,
+                { preferredButtonPlacement: hz.ButtonPlacement.Default },
+            );
+            this.cameraInput.registerCallback((action, pressed) => {
+                if (pressed) {
+                    this.focus.enter();
+                    const position = LocalCamera.position.get().add(hz.Vec3.up.mul(2));
+                    const rotation = LocalCamera.rotation.get();
+                    LocalCamera.setCameraModeFixed({ position: position, rotation: rotation, duration: 0.5 })
+                    .then(() =>  {
+                        this.enablePan = true;
+                        this.cameraInput.disconnect();
+                    })
+                    this.registerBackInput();
+                }
+            });
+        }
+    }
+
+    private registerBackInput() {
+        if (hz.PlayerControls.isInputActionSupported(hz.PlayerInputAction.RightSecondary)) {
+            this.backInput = hz.PlayerControls.connectLocalInput(
+                hz.PlayerInputAction.RightSecondary,
+                hz.ButtonIcon.Door,
+                this.wrapper.component,
+                { preferredButtonPlacement: hz.ButtonPlacement.Default },
+            );
+            this.backInput.registerCallback((action, pressed) => {
+                if (pressed) {
+                    this.enablePan = false;
+                    const position = LocalCamera.position.get().add(hz.Vec3.up.mul(-2));
+                    const rotation = this.aim.getOriginRotation();
+                    const angle = Math.max(0.5, this.aim.getRotation().angleTo(this.aim.getOriginRotation()));
+                    const duration = (angle.toDegrees() / 360).clamp01() * 10;
+                    LocalCamera.setCameraModeFixed({ position: position, rotation: rotation, duration: duration, easing: Easing.EaseInOut })
+                    .then(() => {
+                        this.cursor.clearSelected();
+                        this.focus.exit()
+                        this.backInput.disconnect();
+                    });
+                    this.registerCameraInput();
+                }
+            });
+        }
+    }
+
     private applyPan(pan: hz.Vec3) {
-        const postition = LocalCamera.position.get();
+        if (!this.enablePan) return;
+        const position = LocalCamera.position.get();
         const rotation = this.aim.getRotation();
         this.aim.applyPan(pan);
-        LocalCamera.setCameraModeFixed({ position: postition, rotation: rotation, duration: 0 });
+        LocalCamera.setCameraModeFixed({ position: position, rotation: rotation, duration: 0 });
     }
 
     private leftSideExit() {
-        const postition = LocalCamera.position.get();
+        const position = LocalCamera.position.get();
         const rotation = this.aim.getOriginRotation();
         const angle = this.aim.getRotation().angleTo(this.aim.getOriginRotation());
         const duration = (angle.toDegrees() / 360).clamp01() * 10;
-        LocalCamera.setCameraModeFixed({position: postition, rotation: rotation, duration: duration, easing: Easing.EaseInOut})
-        .then(() => this.focus.exit());
+        LocalCamera.setCameraModeFixed({ position: position, rotation: rotation, duration: duration, easing: Easing.EaseInOut })
+            .then(() => this.focus.exit());
     }
 }

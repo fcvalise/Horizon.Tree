@@ -17,7 +17,7 @@ export class OFocus {
   private rotEps = 0.001;
 
   private dragLast: Record<number, hz.Vec3> = {};
-  private enabled = true;
+  private enabled = false;
 
   constructor(
     private wrapper: OWrapper,

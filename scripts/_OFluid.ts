@@ -48,8 +48,8 @@ export class OFluid {
       const oEntity = this.manager.create();
       this.dropList.push(oEntity);
       oEntity.color = hz.Color.blue;
-      oEntity.isSleep = false;
-      oEntity.isMelody = false;
+      oEntity.isAutoSleep = false;
+      oEntity.isAutoMelody = false;
       oEntity.setTags(['Rain']);
       this.state.set(oEntity, { falling: false, impactT: 0 });
     }

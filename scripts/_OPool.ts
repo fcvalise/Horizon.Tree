@@ -47,6 +47,7 @@ export class OPoolManager {
         if (entity.simulated.get()) {
             entity.interactionMode.set(hz.EntityInteractionMode.Physics);
         }
+        entity.collidable.set(true);
         entity.simulated.set(false);
         await OUtils.waitFor(this.wrapper, () => !entity.simulated.get());
         this.availableCount++;

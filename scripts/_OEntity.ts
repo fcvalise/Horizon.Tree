@@ -8,7 +8,7 @@ import { OMelody } from "_OMelody";
 import { OTrail } from "_OTrail";
 
 export class OEntity {
-  private static melody: OMelody | undefined = undefined;
+  public static melody: OMelody | undefined = undefined;
   private static trail: OTrail | undefined = undefined; // TODO : Use trail
 
   public staticProxy: hz.Entity | undefined;
@@ -17,6 +17,7 @@ export class OEntity {
   private oRotation: hz.Quaternion = hz.Quaternion.zero;
   private oScale: hz.Vec3 = hz.Vec3.zero;
   private oColor: hz.Color = OColor.White;
+  private oSimulated: boolean = false;
 
   private syncAll: boolean = true;
   private syncPosition: boolean = true;
@@ -28,8 +29,9 @@ export class OEntity {
   private timestamp: number = Date.now();
 
   public tags: string[] = [];
-  public isSleep = true;
-  public isMelody = true;
+  public isAutoSleep = true;
+  public isAutoMelody = true;
+  public isCollectible = false;
 
   constructor(
     public entity: hz.Entity | undefined,
@@ -39,7 +41,7 @@ export class OEntity {
 
   public makeDynamic(): boolean {
     if (this.getDynamic()) {
-      if (this.isMelody) this.playMelody();
+      if (this.isAutoMelody) this.playMelody();
       this.cancelTweens();
       this.deleteStatic();
       return true;
@@ -52,6 +54,7 @@ export class OEntity {
       // this.playMelody();
       this.cancelTweens();
       this.entity.simulated.set(true);
+      this.oSimulated = true;
       this.updatePhysics();
       // this.color = OColor.Orange;
       this.timestamp = Date.now();
@@ -139,7 +142,7 @@ export class OEntity {
       this.wrapper.onUpdateUntil(() => {
         this.oPosition = this.entity!.position.get();
         this.oRotation = this.entity!.rotation.get();
-      }, () => (!Boolean(this.entity) || !this.entity!.simulated.get()!))
+      }, () => (!Boolean(this.entity) || !this.oSimulated))
     }, 500);
   }
 
@@ -178,7 +181,7 @@ export class OEntity {
   get color(): hz.Color { return this.oColor.clone(); }
   get isDynamic(): boolean { return Boolean(this.entity); }
   get isStatic(): boolean { return Boolean(this.staticProxy); }
-  get isPhysics(): boolean { return this.entity?.simulated.get() ?? false; }
+  get isPhysics(): boolean { return (this.entity && this.oSimulated) ?? false; } 
   get isInvisible(): boolean { return !this.staticProxy && this.isReady && !this.entity; }
 
   set position(p: hz.Vec3) { this.oPosition = p; this.syncPosition = true }
@@ -190,7 +193,7 @@ export class OEntity {
 
 // --- EASING ---
 type EaseFn = (t: number) => number;
-const Ease = {
+export const Ease = {
   linear: (t: number) => t,
   quadInOut: (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
   cubicOut: (t: number) => 1 - Math.pow(1 - t, 3),

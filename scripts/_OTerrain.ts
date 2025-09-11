@@ -15,7 +15,13 @@ class Cell {
     public discovered: boolean = false;
     public instanciated: boolean = false;
 
+    // neighbors
+    public neighbors4: Cell[] = [];
+    public neighbors8: Cell[] = [];
+
     constructor(
+        public gx: number,
+        public gz: number,
         public position: hz.Vec3,
         public rotation: hz.Quaternion,
         public scale: hz.Vec3,
@@ -25,9 +31,15 @@ class Cell {
 
 export class OTerrain {
     private readonly discoverRange = 10;
-    private readonly maxDistance = 25; 
+    private readonly maxDistance = 25;
     private cellArray: Cell[] = [];
-    
+
+    // grid index
+    private cellByGrid = new Map<string, Cell>();
+    private key = (x: number, z: number) => `${x},${z}`;
+
+    private owner!: OEntity;
+
     constructor(
         private wrapper: OWrapper,
         private manager: OEntityManager,
@@ -44,30 +56,50 @@ export class OTerrain {
             const distance = this.minPlayerDistance(cell.position);
             if (!cell.oEntity) {
                 cell.oEntity = this.manager.create()
+                if (!this.owner) {
+                    this.owner = cell.oEntity;
+                }
             } else if (!cell.discovered && distance < this.discoverRange) {
                 cell.oEntity.scale = cell.scale;
                 cell.oEntity.color = cell.color;
-                cell.oEntity.position = cell.position;//.add(hz.Vec3.up.mul(-5));
+                cell.oEntity.position = cell.position;
                 cell.oEntity.rotation = cell.rotation;
-                if (cell.oEntity.makeDynamic()) {
+                if (cell.oEntity.makeDynamic() || cell.oEntity.entity) {
+                    cell.oEntity.playMelody();
                     cell.discovered = true;
+                    cell.oEntity.color = OColor.DarkGreen;
                     cell.oEntity.setTags(['Terrain']);
+                    cell.oEntity.cancelTweens();
                     cell.oEntity.scaleZeroTo(cell.scale, 0.8)
                     .then(() => {
                         this.wrapper.component.sendNetworkBroadcastEvent(OEvent.onTerrainSpawn, { entity: cell.oEntity?.entity! });
                     });
+                    for (const neighbor of cell.neighbors4) {
+                        if (!neighbor.instanciated && !neighbor.discovered) {
+                            if (!neighbor.oEntity) continue;
+                            neighbor.oEntity.position = neighbor.position;
+                            neighbor.oEntity.rotation = neighbor.rotation;
+                            neighbor.oEntity.scale = neighbor.scale.mul(0.5);
+                            neighbor.oEntity.color = OColor.LightGreen;
+                            if (neighbor.oEntity.makeDynamic()) {
+                                neighbor.instanciated = true;
+                                neighbor.oEntity.setTags(['Terrain']);
+                                neighbor.oEntity.scaleZeroTo(neighbor.oEntity!.scale, 0.6, false);
+                            }
+                        }
+                    }
                 }
             }
-            //  else if (!cell.discovered && !cell.instanciated) {
-            //     cell.oEntity.position = cell.position;
-            //     cell.oEntity.rotation = cell.rotation;
-            //     cell.oEntity.scale = cell.scale;
-            //     cell.oEntity.color = OColor.Grey;
-            //     if (cell.oEntity.makeDynamic()) {
-            //         cell.instanciated = true;
-            //         cell.oEntity.setTags(['Terrain']);
-            //         cell.oEntity.scaleZeroTo(cell.oEntity.scale, 0.8)
-            //     }
+            // else if (!cell.discovered && !cell.instanciated) {
+            //   cell.oEntity.position = cell.position;
+            //   cell.oEntity.rotation = cell.rotation;
+            //   cell.oEntity.scale = cell.scale;
+            //   cell.oEntity.color = OColor.Grey;
+            //   if (cell.oEntity.makeDynamic()) {
+            //     cell.instanciated = true;
+            //     cell.oEntity.setTags(['Terrain']);
+            //     cell.oEntity.scaleZeroTo(cell.oEntity.scale, 0.8)
+            //   }
             // }
         }
         this.updateUI();
@@ -97,7 +129,7 @@ export class OTerrain {
             const posY = this.easeInExpo(noise) * 2;
             const posZ = z * this.cellSize + this.cellSize * 0.5;
             const position = new hz.Vec3(posX, posY, posZ).add(startPos);
-            //rotation
+            // rotation
             const lookAtDir = hz.Vec3.down.mul(10).add(this.random.vectorHalf());
             const twist = lookAtDir.rotateArround(this.random.range(0, 360), lookAtDir);
             let rotation = hz.Quaternion.lookRotation(twist);
@@ -114,33 +146,56 @@ export class OTerrain {
             let color = new hz.Color(r, g, b);
             color = OColor.LightGreen;
 
-            // if (noise > 0.85) {
-            //     color = new hz.Color(0.5, 0.5, 0.5);
-            //     rotation = hz.Quaternion.lookRotation(this.random.vectorHalf());
-            //     const scaleXYZ = this.random.range(2, 6) * noise;
-            //     position.y -= scaleXYZ * 0.5;
-            //     scale = new hz.Vec3(scaleXYZ, scaleXYZ, scaleXYZ);
-            // }
-
             const distance = hz.Vec3.zero.distance(position) / this.maxDistance;
             noise -= distance * distance * 0.5;
             if (noise > 0.2) {
-                const cell = new Cell(position, rotation, scale, color);
+                const cell = new Cell(x, z, position, rotation, scale, color);
                 this.cellArray.push(cell);
+                this.cellByGrid.set(this.key(x, z), cell);
             }
         });
+
+        this.buildNeighbors();
+    }
+
+    private buildNeighbors() {
+        const d4 = [
+            [1, 0], [-1, 0],
+            [0, 1], [0, -1],
+        ];
+        const diag = [
+            [1, 1], [1, -1],
+            [-1, 1], [-1, -1],
+        ];
+
+        for (const cell of this.cellArray) {
+            const { gx, gz } = cell;
+
+            cell.neighbors4.length = 0;
+            for (const [dx, dz] of d4) {
+                const n = this.cellByGrid.get(this.key(gx + dx, gz + dz));
+                if (n) cell.neighbors4.push(n);
+            }
+
+            cell.neighbors8.length = 0;
+            cell.neighbors8.push(...cell.neighbors4);
+            for (const [dx, dz] of diag) {
+                const n = this.cellByGrid.get(this.key(gx + dx, gz + dz));
+                if (n) cell.neighbors8.push(n);
+            }
+        }
     }
 
     private updateUI() {
         const current = this.cellArray.filter(c => c.discovered).length;
         const total = this.cellArray.length;
-        const percent =  current / total;
+        const percent = current / total;
         this.wrapper.component.sendNetworkBroadcastEvent(UpdateUIBar, {
             id: 'Discovered', percent: percent, text: `${current}/${total}`
         });
     }
 
     public easeInExpo(x: number): number {
-		return x === 0 ? 0 : Math.pow(2, 10 * x - 10);
-	}
+        return x === 0 ? 0 : Math.pow(2, 10 * x - 10);
+    }
 }

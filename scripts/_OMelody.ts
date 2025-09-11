@@ -68,7 +68,7 @@ export class OMelody {
     Leaf:    { offset: 0, octaveBias: +1 },
     Branch:  { offset: 2, octaveBias:  0 },
     Terrain: { offset: 4, octaveBias: -1 },
-    Rain:    { offset: 8, octaveBias:  4 },
+    Rain:    { offset: -1, octaveBias: 0 },
     Other:   { offset: 0, octaveBias:  0 },
   };
 

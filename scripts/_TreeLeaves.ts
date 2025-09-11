@@ -36,7 +36,7 @@ export class TreeLeaves {
         }
     };
 
-    public async placeLeaves(bud: Bud, forward: hz.Vec3, segLen: number): Promise<void> {
+    public async placeLeaves(bud: Bud, forward: hz.Vec3): Promise<void> {
         if (bud.depth / this.treeSettings.maxDepth < this.settings.minBranch) return; // && bud.length > this.settings.growth.segmentLength * 0.4) {
 
         const vcount = Math.max(1, this.settings.count);
@@ -51,7 +51,7 @@ export class TreeLeaves {
             const frac = (v + 1) / (vcount + 1);
             const jitterDefault = this.settings.axialJitter
             const jitter = jitterDefault !== 0 ? this.random.range(-jitterDefault, jitterDefault) : 0;
-            const nodeOrigin = bud.position.add(forward.mul(segLen * (frac + jitter).clamp01()));
+            const nodeOrigin = bud.position.add(forward.mul(bud.length * (frac + jitter).clamp01()));
             const subIndex = bud.nodeIndex * vcount + v;
 
             switch (ph) {

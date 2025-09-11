@@ -70,7 +70,7 @@ export class TreeBase {
     constructor(
         private wrapper: OWrapper,
         private manager: OEntityManager,
-        position: hz.Vec3,
+        public position: hz.Vec3,
         overrides?: Partial<TreeSettings>
     ) {
         const random = new ORandom(position.x * position.z * position.y);
