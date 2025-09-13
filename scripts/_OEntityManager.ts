@@ -1,4 +1,5 @@
 import * as hz from "horizon/core";
+import "./_OMath";
 import { OEntity } from "_OEntity";
 import { OWrapper } from "_OWrapper";
 import { OPoolManager } from "_OPool";
@@ -42,7 +43,10 @@ export class OEntityManager {
     }
 
     private update(dt: number) {
+        const player = this.wrapper.world.getPlayers()[0];
+        const position = player.position.get();
         for (const oEntity of this.allList) {
+            oEntity.isUpdated = position.distanceSquared(oEntity.position) < 100;
             this.fallingObject(oEntity);
             // this.sleepPhysics(oEntity, dt);
         }

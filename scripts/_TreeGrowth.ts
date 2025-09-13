@@ -12,7 +12,7 @@ import { PlayerLocal } from "_PlayerLocal";
 import { OColor } from "_OColor";
 import { OEntityManager } from "_OEntityManager";
 import { estimateTreeProgressCurrent } from "_TreeProgress";
-import { InteractableRegistry } from "_OTrigger";
+import { InteractableRegistry } from "_OTriggerPool";
 
 export type Bud = {
     position: hz.Vec3;

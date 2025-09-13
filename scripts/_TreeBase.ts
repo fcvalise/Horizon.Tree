@@ -1,6 +1,5 @@
 import * as hz from "horizon/core";
 import { Library } from "_Library";
-import { RNG } from "_RNG";
 import { OWrapper } from "_OWrapper";
 import { TreeSettings } from "_TreeSettings";
 import { TreeGrowth } from "_TreeGrowth";
@@ -54,9 +53,6 @@ const DefaultSettings: TreeSettings = {
         branchingPhase: "Sylleptic"
     },
 };
-
-const pick = <T>(arr: readonly T[]): T =>
-arr[Math.floor(RNG.get().range(0, arr.length))];
 
 export function cloneSettings(settings: TreeSettings): TreeSettings {
   return JSON.parse(JSON.stringify(settings)) as TreeSettings;
@@ -117,43 +113,4 @@ export class TreeBase {
     //         entityArray[0].children.get()[0].as(hz.TextGizmo).text.set(description);
     //     });
     // }
-
-    getRandomSettings(position: hz.Vec3) {
-        return {
-            seed: `${position.z * position.x * position.y * 127326542734}`,
-            maxDepth: 7,
-            branch: {
-                initialCount: RNG.get().range(1, 4),
-                length: RNG.get().range(0.4, 2),
-                lengthDecay: RNG.get().range(0.5, 0.9),
-                bottomWidth: RNG.get().range(0.1, 0.25),
-                topWidth: RNG.get().range(0.001, 0.1),
-                chance: RNG.get().range(0, 0.9),
-                angle: RNG.get().range(10, 90),
-                rollMax: 15,
-                growAfterPrune: false
-            },
-            tropism: {
-                raysPerBud: 50,
-                phototropismWeight: RNG.get().range(0.6, 1),
-                phototropismBoost: 10,
-                gravitropismWeight: RNG.get().range(0.2, 0.8),
-                apicalWeight: RNG.get().range(0.2, 0.8),
-                jitterStrength: RNG.get().range(0.01, 0.2),
-            },
-            render: {
-                segmentAssetId: Library.matter,
-                leafAssetId: Library.matter,
-                leafScale: RNG.get().range(0.3, 1.2)
-            },
-            architecture: {
-                growthRhythm: pick(["Continuous", "Rhythmic"] as const),
-                flushPeriodFrames: Math.floor(RNG.get().range(8, 24)),
-                flushBurstFrames: Math.floor(RNG.get().range(2, 8)),
-                tropism: pick(["Orthotropic", "Plagiotropic", "None"] as const),
-                mainAxis: pick(["Monopodial", "Sympodial"] as const),
-                branchingPhase: pick(["Sylleptic", "Proleptic"] as const),
-            },
-        };
-    }
 }

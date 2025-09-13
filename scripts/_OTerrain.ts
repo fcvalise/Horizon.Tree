@@ -5,10 +5,10 @@ import { OEntity } from "_OEntity";
 import { OWrapper } from "_OWrapper";
 import { ORandom } from "_ORandom";
 import { OEntityManager } from "_OEntityManager";
-import { UpdateUIBar } from "UIBarController";
 import { OEvent } from "_OEvent";
 import { OColor } from "_OColor";
-import { OMelody } from "_OMelody";
+import { OuiProgressEvent } from "_OuiProgress";
+import { OuiMapEvent } from "_OuiMap";
 
 class Cell {
     public oEntity: OEntity | undefined;
@@ -88,6 +88,7 @@ export class OTerrain {
                             }
                         }
                     }
+                    this.updateUI();
                 }
             }
             // else if (!cell.discovered && !cell.instanciated) {
@@ -102,7 +103,6 @@ export class OTerrain {
             //   }
             // }
         }
-        this.updateUI();
     }
 
     private minPlayerDistance(position: hz.Vec3) {
@@ -186,13 +186,33 @@ export class OTerrain {
         }
     }
 
+    private buildMapStr(glyph = '.', spacer = ' '): string {
+        let str: string = '';
+        for (let x = 0; x < this.gridSize; x++) {
+            for (let z = 0; z < this.gridSize; z++) {
+                const cell = this.cellByGrid.get(this.key(x, z));
+                str += cell && !cell?.discovered ? glyph : spacer;
+            }
+            str += '.\n';
+        }
+        for (let x = 0; x < this.gridSize; x++) {
+            for (let z = 0; z < this.gridSize; z++) {
+                str += '.'
+            }
+            str += '.\n';
+        }
+        return str;
+    }
+
+
     private updateUI() {
         const current = this.cellArray.filter(c => c.discovered).length;
         const total = this.cellArray.length;
-        const percent = current / total;
-        this.wrapper.component.sendNetworkBroadcastEvent(UpdateUIBar, {
-            id: 'Discovered', percent: percent, text: `${current}/${total}`
+        const percent = current / total * 100;
+        this.wrapper.component.sendNetworkBroadcastEvent(OuiProgressEvent, {
+            id: 'TerrainProgress', percent: percent, text: `${current}/${total}`
         });
+        this.wrapper.component.sendNetworkBroadcastEvent(OuiMapEvent, { grid: this.buildMapStr() })
     }
 
     public easeInExpo(x: number): number {

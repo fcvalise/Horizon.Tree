@@ -1,4 +1,5 @@
 import * as hz from "horizon/core";
+import "./_OMath";
 import { Library } from "_Library";
 import { OWrapper } from "_OWrapper";
 import { OPoolManager } from "_OPool";
@@ -29,9 +30,12 @@ export class OEntity {
   private timestamp: number = Date.now();
 
   public tags: string[] = [];
+  public isUpdated = false;
   public isAutoSleep = true;
   public isAutoMelody = true;
   public isCollectible = false;
+  public isSleeping = false;
+  public isFalling = false;
 
   constructor(
     public entity: hz.Entity | undefined,
@@ -51,12 +55,13 @@ export class OEntity {
 
   public makePhysic(): boolean {
     if (this.entity) {
-      // this.playMelody();
       this.cancelTweens();
       this.entity.simulated.set(true);
       this.oSimulated = true;
+      this.isSleeping = false;
+      this.isFalling = false;
       this.updatePhysics();
-      // this.color = OColor.Orange;
+      this.enableTrail(true)
       this.timestamp = Date.now();
       return true;
     }
@@ -101,7 +106,6 @@ export class OEntity {
   private getStatic(needDynamic: boolean): boolean {
     if (!this.staticProxy && this.isReady && (this.entity || !needDynamic)) {
       this.isReady = false;
-      // this.oColor = OColor.White;
       const id = Library.colorMap.get(this.oColor)!;
       const asset = new hz.Asset(BigInt(id));
       const position = this.oPosition.add(this.oRotation.forward.mul(-0.01))
@@ -116,7 +120,6 @@ export class OEntity {
           this.deleteStatic();
         } else {
           this.deleteDynamic();
-          // this.oColor = OColor.Grey;
         }
       });
       return true;
@@ -142,8 +145,26 @@ export class OEntity {
       this.wrapper.onUpdateUntil(() => {
         this.oPosition = this.entity!.position.get();
         this.oRotation = this.entity!.rotation.get();
+        const physics = this.entity?.as(hz.PhysicalEntity);
+        const velocity = physics?.velocity.get().length2()!;
+        if (!this.isFalling && velocity > 0.01) this.isFalling = true;
+        if (this.isFalling && !this.isSleeping && velocity < 0.1){
+          this.enableTrail(false);
+          this.isSleeping = true;
+        }
       }, () => (!Boolean(this.entity) || !this.oSimulated))
     }, 500);
+  }
+
+  public enableTrail(isEnable: boolean = true) {
+    if (!OEntity.trail) {
+      OEntity.trail = new OTrail(this.wrapper);
+    }
+    if (isEnable) {
+      OEntity.trail.attach(this);
+    } else {
+      OEntity.trail.detach(this);
+    }
   }
 
   public setTags(tags: string[]) {
@@ -165,7 +186,7 @@ export class OEntity {
   }
 
   public sync() {
-    if (this.entity) {
+    if (this.entity && this.isUpdated) {
       const mesh = this.entity.as(hz.MeshEntity);
       if (this.syncScale || this.syncAll) { this.entity.scale.set(this.oScale); this.syncScale = false; }
       if (this.syncColor || this.syncAll) { mesh.style.tintColor.set(this.oColor); this.syncColor = false; }
@@ -243,6 +264,7 @@ function unsubscribe(sub: any) {
 // --- OEntity tween methods (prototype extension) ---
 interface TweenArgs {
   position?: hz.Vec3;
+  positionGetter?: () => hz.Vec3;
   rotation?: hz.Quaternion;
   scale?: hz.Vec3;
   color?: hz.Color;
@@ -256,6 +278,7 @@ declare module "_OEntity" {
   interface OEntity {
     tweenTo(args: TweenArgs): Promise<void>;
     moveTo(p: hz.Vec3, duration: number, makeStatic?: boolean, ease?: EaseFn, delay?: number): Promise<void>;
+    moveToDynamic(getTargetPosition: () => hz.Vec3, duration: number, makeStatic?: boolean, ease?: EaseFn, delay?: number): Promise<void>;
     moveBy(d: hz.Vec3, duration: number, makeStatic?: boolean, ease?: EaseFn, delay?: number): Promise<void>;
     rotateTo(q: hz.Quaternion, duration: number, makeStatic?: boolean, ease?: EaseFn, delay?: number): Promise<void>;
     scaleTo(s: hz.Vec3, duration: number, makeStatic?: boolean, ease?: EaseFn, delay?: number): Promise<void>;
@@ -276,53 +299,81 @@ OEntity.prototype.tweenTo = function (args: TweenArgs): Promise<void> {
   const makeStatic = args.makeStatic ?? true;
   const ease = args.ease ?? Ease.easeOutElastic;
   const delay = Math.max(0, args.delay ?? 0);
-  const dur = Math.max(0.0001, args.duration);
+  const duration = Math.max(0.0001, args.duration);
 
-  // capture starts from LOCAL buffers (getters clone)
-  const p0 = this.position, p1 = args.position ?? p0.clone();
-  const q0 = this.rotation, q1 = args.rotation ?? q0.clone();
-  const s0 = this.scale, s1 = args.scale ?? s0.clone();
-  const c0 = this.color, c1 = args.color ?? c0.clone();
+  // capture starts from local buffers (getters clone)
+  const startPosition = this.position;
+  const startRotation = this.rotation;
+  const startScale = this.scale;
+  const startColor = this.color;
+
+  // static end values (used when no getter is provided)
+  const staticEndPosition = args.position ?? startPosition.clone();
+  const staticEndRotation = args.rotation ?? startRotation.clone();
+  const staticEndScale = args.scale ?? startScale.clone();
+  const staticEndColor = args.color ?? startColor.clone();
 
   if (!this.__tweenSubs) this.__tweenSubs = new Set<any>();
 
-  // ensure a flush on next frame even if your constructor's sync loop isn't running yet
+  // ensure a flush on next frame even if your constructor's sync loop is not running yet
   (this as any).syncAll = true;
 
-  let tAcc = 0;
+  let accumulatedTime = 0;
   let started = (delay <= 0);
 
   return new Promise<void>((resolve) => {
-    const sub = this.wrapper.onUpdate((dt: number) => {
-      tAcc += dt;
+    const subscription = this.wrapper.onUpdate((deltaSeconds: number) => {
+      accumulatedTime += deltaSeconds;
 
       if (!started) {
-        if (tAcc >= delay) { started = true; tAcc -= delay; } else { return; }
+        if (accumulatedTime >= delay) { started = true; accumulatedTime -= delay; }
+        else { return; }
       }
 
-      const t = clamp01(tAcc / dur);
+      const t = clamp01(accumulatedTime / duration);
       const k = ease(t);
 
-      if (args.position) this.position = vec3Lerp(p0, p1, k);
-      if (args.rotation) this.rotation = quatSlerp(q0, q1, k);
-      if (args.scale) this.scale = vec3Lerp(s0, s1, k);
-      if (args.color) this.color = colorLerp(c0, c1, k);
+      // If a positionGetter is provided, fetch the CURRENT target each frame.
+      // Otherwise use the static value captured at start.
+      const currentTargetPosition =
+        typeof args.positionGetter === "function"
+          ? args.positionGetter()
+          : staticEndPosition;
+
+      if (args.position || args.positionGetter) {
+        this.position = vec3Lerp(startPosition, currentTargetPosition, k);
+      }
+      if (args.rotation) {
+        this.rotation = quatSlerp(startRotation, staticEndRotation, k);
+      }
+      if (args.scale) {
+        this.scale = vec3Lerp(startScale, staticEndScale, k);
+      }
+      if (args.color) {
+        this.color = colorLerp(startColor, staticEndColor, k);
+      }
 
       if (t >= 1) {
-        // snap to exact end
-        if (args.position) this.position = p1.clone();
-        if (args.rotation) this.rotation = q1.clone();
-        if (args.scale) this.scale = s1.clone();
-        if (args.color) this.color = c1.clone();
-        if (makeStatic) this.makeStatic()
+        // Snap to exact end values at completion.
+        if (args.position || args.positionGetter) {
+          const finalPosition =
+            typeof args.positionGetter === "function"
+              ? args.positionGetter()
+              : staticEndPosition;
+          this.position = finalPosition.clone();
+        }
+        if (args.rotation) this.rotation = staticEndRotation.clone();
+        if (args.scale) this.scale = staticEndScale.clone();
+        if (args.color) this.color = staticEndColor.clone();
+        if (makeStatic) this.makeStatic();
 
-        unsubscribe(sub);
-        this.__tweenSubs!.delete(sub);
+        unsubscribe(subscription);
+        this.__tweenSubs!.delete(subscription);
         resolve();
       }
     });
 
-    this.__tweenSubs!.add(sub);
+    this.__tweenSubs!.add(subscription);
   });
 };
 
@@ -345,4 +396,7 @@ OEntity.prototype.tintTo = function (c, duration, makeStatic, ease = Ease.custom
 OEntity.prototype.scaleZeroTo = function (s, duration, makeStatic, ease = Ease.custom, delay = 0) {
   this.scale = hz.Vec3.zero;
   return this.tweenTo({ scale: s, duration, makeStatic, ease, delay });
+};
+OEntity.prototype.moveToDynamic = function (getTargetPosition, duration, makeStatic, ease = Ease.custom, delay = 0) {
+  return this.tweenTo({ positionGetter: getTargetPosition, duration, makeStatic, ease, delay });
 };
