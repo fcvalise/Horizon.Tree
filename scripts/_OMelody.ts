@@ -1,6 +1,7 @@
 import * as hz from "horizon/core";
 import { ORandom } from "_ORandom";
 import { OWrapper } from "_OWrapper";
+import { OUtils } from "_OUtils";
 
 export type ScaleName =
   | "pentMaj" | "pentMin" | "major" | "minor"
@@ -148,13 +149,8 @@ export class OMelody {
   }
 
   triggerWithTags(pos: hz.Vec3, tags: string[] | undefined) {
-    if (this.player == undefined) {
-      this.player = this.wrapper.world.getPlayers().find(p => p.name.get() == "OisifGames")!;
-    }
-    if (!this.player) return;
-
-    const d = this.player.position.get().distance(pos);
-    if (d > this.maxDistance) {
+    const result = OUtils.closestPlayer(this.wrapper, pos);
+    if (result.distance > this.maxDistance) {
       if (!this.quantize) this.flushTick();
       return;
     }
@@ -162,7 +158,7 @@ export class OMelody {
     const group = this.tagsToGroup(tags);
     const vel = 0.7 + 0.3 * this.rng.next();
     const dur = 0.12 + 0.08 * this.rng.next();
-    this.pending.push({ pos, vel, dur, group, dist: d });
+    this.pending.push({ pos, vel, dur, group, dist: result.distance });
 
     if (!this.quantize) this.flushTick(); // immediate play mode
   }

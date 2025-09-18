@@ -1,3 +1,4 @@
+import * as hz from "horizon/core";
 import { OWrapper } from "_OWrapper";
 
 export class OUtils {
@@ -28,5 +29,20 @@ export class OUtils {
             }
             x += dx; y += dy;
         }
+    }
+
+    public static closestPlayer(wrapper: OWrapper, position: hz.Vec3): { player: hz.Player, distance: number } {
+        const playerList = wrapper.world.getPlayers();
+        let minDistance = Number.MAX_VALUE;
+        let closePlayer: hz.Player = wrapper.world.getServerPlayer();
+        for (const player of playerList) {
+            const playerPosition = player.position.get();
+            const distance = playerPosition.distance(position);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closePlayer = player
+            }
+        }
+        return { player: closePlayer, distance: minDistance };
     }
 }

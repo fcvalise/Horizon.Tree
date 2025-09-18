@@ -5,6 +5,7 @@ import { Bud } from "_TreeGrowth";
 import { LeafSettings, TreeSettings } from "_TreeSettings";
 import { OColor } from "_OColor";
 import { OEntityManager } from "_OEntityManager";
+import { Ease } from "_OEntity";
 
 export class TreeLeaves {
     constructor(
@@ -25,11 +26,16 @@ export class TreeLeaves {
                 const upY = hz.Vec3.cross(radial, rightX).normalize();
                 oEntity.position = nodeOrigin.add(radial.mul(this.settings.petioleLength));
                 oEntity.rotation = hz.Quaternion.lookRotation(radial, upY);
-                oEntity.scale = hz.Vec3.one.mul(this.settings.scale);
+                oEntity.scale = hz.Vec3.zero;
                 oEntity.color = OColor.LightGreen;
-                bud.oEntityList?.push(oEntity);
                 oEntity.setTags(['Leaf'])
-                oEntity.scaleZeroTo(oEntity.scale, this.random.range(1, 4));
+                await oEntity.tweenTo({
+                    duration: this.random.range(0.8, 1.2),
+                    scale: hz.Vec3.one.mul(this.settings.scale - this.random.next()),
+                    makeStatic: true,
+                    ease: Ease.cubicOut
+                });
+                bud.oEntityList?.push(oEntity);
             }
         } else {
             this.placeAt(bud, nodeOrigin, phiDeg, side, forward);

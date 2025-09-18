@@ -9,9 +9,7 @@ import { OEvent } from "_OEvent";
 import { PlayerLocal } from "_PlayerLocal";
 import { TreeBase } from "_TreeBase";
 import { OFluid } from "_OFluid";
-import { UpdateUIBar } from "UIBarController";
 import { OInventoryManager } from "_OInventory";
-import { OEntity } from "_OEntity";
 
 export class OisifManager {
     // public static I: OisifManager; // TODO : Should be removed
@@ -38,19 +36,21 @@ export class OisifManager {
         this.inventory = new OInventoryManager(this.wrapper, this.manager);
 
         this.cloud = new OClouds(this.wrapper, this.pool, this.random);
-        this.terrain = new OTerrain(this.wrapper, this.manager, this.random, 40, 4);
-        this.wrapper.component.connectNetworkBroadcastEvent(UpdateUIBar, (payload) => {
-            if (payload.id == 'Discovered' && payload.percent == 1 && !this.fuild) {
-                this.fuild = new OFluid(this.wrapper, this.manager, new hz.Vec3(0, 10, 0));
-                OEntity.melody!.useScale("mixolydian")
-                .useKey("D")
-                .setOctaves(1, 3)
-                .setQuantize(true, { bpm: 300, maxPerTick: 12 });
-            }
-        })
+        this.terrain = new OTerrain(this.wrapper, this.manager, this.inventory, this.random, 40, 4);
+        // this.wrapper.component.connectNetworkBroadcastEvent(UpdateUIBar, (payload) => {
+        //     if (payload.id == 'Discovered' && payload.percent == 1 && !this.fuild) {
+        //         this.fuild = new OFluid(this.wrapper, this.manager, new hz.Vec3(0, 10, 0));
+        //         OEntity.melody!.useScale("mixolydian")
+        //         .useKey("D")
+        //         .setOctaves(1, 3)
+        //         .setQuantize(true, { bpm: 300, maxPerTick: 12 });
+        //     }
+        // })
+
+        new TreeBase(this.wrapper, this.manager, new hz.Vec3(2.16, 2.25, 3.46));
 
         this.wrapper.component.connectNetworkBroadcastEvent(OEvent.onTerrainSpawn, (payload) => {
-            if (this.random.bool(0.3)) {
+            if (this.random.bool(0.4)) {
                 const tree = new TreeBase(this.wrapper, this.manager, payload.entity.position.get());
                 this.treeList.push(tree);
             }

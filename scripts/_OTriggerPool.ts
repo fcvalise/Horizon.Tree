@@ -2,25 +2,52 @@ import { OEntity } from "_OEntity";
 import * as hz from "horizon/core";
 
 export class Interactable {
-  constructor(public oEntity: OEntity, public interact: (player: hz.Player) => void) {}
-  static inline(oEntity: OEntity, interact: (player: hz.Player) => void) { return new Interactable(oEntity, interact); }
+  constructor(public oEntity: OEntity, public interact: (player: hz.Player) => void) { }
+  static create(oEntity: OEntity, interact: (player: hz.Player) => void) { return new Interactable(oEntity, interact); }
 }
 
 export class InteractableRegistry {
   static readonly I = new InteractableRegistry();
   private readonly items = new Set<Interactable>();
 
-  add(item: Interactable): () => void { this.items.add(item); return () => this.items.delete(item); }
-  addInline(oEntity: OEntity, interact: (player: hz.Player) => void) { return this.add(Interactable.inline(oEntity, interact)); }
-  forEach(visitor: (item: Interactable) => void) { this.items.forEach(visitor); }
+  add(item: Interactable): () => void;
+  add(oEntity: OEntity, interact: (player: hz.Player) => void): () => void;
+
+  add(arg1: Interactable | OEntity, arg2?: (player: hz.Player) => void): () => void {
+    if (arg1 instanceof Interactable) {
+      this.items.add(arg1);
+      return () => this.items.delete(arg1);
+    } else {
+      const item = Interactable.create(arg1, arg2!);
+      this.items.add(item);
+      return () => this.items.delete(item);
+    }
+  }
+
+  forEach(visitor: (item: Interactable) => void) {
+    this.items.forEach(visitor);
+  }
+
+  delete(oEntity: OEntity): boolean;
+  delete(item: Interactable): boolean;
+  delete(arg: Interactable | OEntity): boolean {
+    if (arg instanceof Interactable) {
+      return this.items.delete(arg);
+    }
+    this.items.forEach((item) => {
+      if (item.oEntity === arg) {
+        return this.items.delete(item);
+      }
+    })
+    return false;
+  }
 }
 
-class OTriggerPool extends hz.Component<typeof OTriggerPool> {
-  static propsDefinition = {
-    radius:       { type: hz.PropTypes.Number, default: 4 },
-    tickSeconds:  { type: hz.PropTypes.Number, default: 0.2 },
-  };
 
+class OTriggerPool extends hz.Component<typeof OTriggerPool> {
+  private searchRadius = 6;
+  private activateRadius = 2;
+  private tickSeconds = 0.2;
   private triggerPool: hz.Entity[] = [];
   private triggerToInteractable = new Map<hz.Entity, Interactable>();
 
@@ -34,13 +61,12 @@ class OTriggerPool extends hz.Component<typeof OTriggerPool> {
       });
     }
 
-    this.async.setInterval(() => this.updatePool(), Number(this.props.tickSeconds ?? 0.2));
+    this.async.setInterval(() => this.updatePool(), Number(this.tickSeconds));
   }
 
   private updatePool() {
     const players = this.world.getPlayers() as hz.Player[];
     if (!players.length || !this.triggerPool.length) return;
-    const searchRadius = Number(this.props.radius ?? 4);
     const candidateList: { interactable: Interactable; distance: number; playerPosition: hz.Vec3 }[] = [];
 
     InteractableRegistry.I.forEach((interactable) => {
@@ -54,9 +80,12 @@ class OTriggerPool extends hz.Component<typeof OTriggerPool> {
           closestDistance = distance;
           closestPlayerPosition = playerPosition;
         }
+        if (closestDistance <= this.activateRadius) {
+          interactable.interact(players[i]);
+        }
       }
 
-      if (closestDistance <= searchRadius) {
+      if (closestDistance <= this.searchRadius) {
         candidateList.push({ interactable, distance: closestDistance, playerPosition: closestPlayerPosition });
       }
     });
@@ -71,7 +100,7 @@ class OTriggerPool extends hz.Component<typeof OTriggerPool> {
         const candidate = candidateList[i];
         const oEntity = candidate.interactable.oEntity;
         const position = oEntity.position;
-        const targetPosition = position.add(oEntity.rotation.forward.mul(oEntity.scale.z * 0.5));
+        const targetPosition = position;//.add(oEntity.rotation.forward.mul(oEntity.scale.z * 0.5));
 
         this.triggerToInteractable.set(triggerEntity, candidate.interactable);
         triggerEntity.position.set(targetPosition);

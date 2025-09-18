@@ -1,6 +1,5 @@
 import * as hz from 'horizon/core';
 import { OWrapper } from '_OWrapper';
-import { TreeEvent } from '_TreeEvent';
 
 class Computer extends hz.Component<typeof Computer> {
   private wrapper: OWrapper = new OWrapper(this);

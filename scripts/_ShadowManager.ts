@@ -19,7 +19,7 @@ export class ShadowManager extends hz.Component<typeof ShadowManager> {
         this.updateCaster();
         this.connectLocalBroadcastEvent(hz.World.onUpdate, () => this.updateShadows());
         // Uncomment if your caster changes in real time
-        // this.connectLocalBroadcastEvent(hz.World.onUpdate, () => this.updateCaster());
+        this.connectLocalBroadcastEvent(hz.World.onUpdate, () => this.updateCaster());
     }
 
     private preparePool() {

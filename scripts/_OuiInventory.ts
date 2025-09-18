@@ -29,7 +29,7 @@ export class OuiInventory extends UIComponent<typeof OuiInventory> {
       let slot = this.slots.find(s => s.id === data.id);
       if (!slot) {
         slot = this.slots.find(s => s.id === "");
-        if (!slot) return; // all 6 are in use
+        if (!slot) return;
         slot.id = data.id;
         if (data.color) slot.color = data.color;
       }
@@ -79,8 +79,8 @@ export class OuiInventory extends UIComponent<typeof OuiInventory> {
 
   initializeUI(): UINode {
     const defaults = [
-      OuiHelper.color(OColor.Black, 0.8),
-      OuiHelper.color(OColor.LightGreen, 0.8),
+      OuiHelper.color(OColor.Orange, 0.8),
+      // OuiHelper.color(OColor.Black, 0.8),
     //   OuiHelper.color(OColor.LightGreen, 0.8), // duplicate or replace with your palette
     //   OuiHelper.color(OColor.Black, 0.8),
     //   OuiHelper.color(OColor.LightGreen, 0.8),

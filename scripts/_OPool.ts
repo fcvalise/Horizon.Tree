@@ -1,13 +1,13 @@
 import * as hz from "horizon/core";
-import { Library } from "_Library";
-import { UpdateUIBar } from "UIBarController";
 import { OWrapper } from "_OWrapper";
 import { OUtils } from "_OUtils";
-// import { OEntity } from "_OEntity";
+import { OuiProgressEvent } from "_OuiProgress";
+import { OColor } from "_OColor";
 
 export class OPoolEntity {
     public isUse: boolean = false;
     public lastUse: number = Date.now();
+    public isReady: boolean = false;
 
     constructor(public entity: hz.Entity) {}
 }
@@ -19,39 +19,56 @@ export class OPoolManager {
     private availableCount: number = 0;
 
     constructor(private wrapper: OWrapper) {
-        // this.createAsset();
-        // this.createAsset();
-        // this.createAsset();
-        // this.createAsset();
         this.getReserve();
     }
 
     public count() {
-        return this.availableCount;
+        // return this.availableCount;
+        return this.pool.filter(p => !p.isUse && p.isReady).length;
     }
 
     public get(): hz.Entity | undefined {
-        const pEntity = this.pool.find(e => !e.isUse);
-        if (pEntity) {
-            pEntity.lastUse = Date.now();
-            pEntity.isUse = true;
-            this.availableCount--;
+        const now = Date.now();
+        let best: OPoolEntity | undefined;
+        let bestAge = -1;
+
+        for (const pEntity of this.pool) {
+            if (pEntity.isUse || !pEntity.isReady) continue;
+            const age = now - pEntity.lastUse;
+            if (age > bestAge) {
+                best = pEntity;
+                bestAge = age;
+            }
+        }
+
+        if (best) {
+            best.isUse = true;
+            best.lastUse = now;
+            this.availableCount = Math.max(0, this.availableCount - 1);
             this.updateUI();
-            return pEntity.entity;
+            return best.entity;
         }
         return undefined;
     }
 
-    public async prepare(entity: hz.Entity) {
+    public async prepare(pEntity: OPoolEntity) {
+        const entity = pEntity.entity;
+        pEntity.isReady = false;
+
         entity.scale.set(hz.Vec3.zero);
-        if (entity.simulated.get()) {
-            entity.interactionMode.set(hz.EntityInteractionMode.Physics);
-        }
-        entity.collidable.set(true);
+        entity.simulated.set(true);
+        entity.interactionMode.set(hz.EntityInteractionMode.Grabbable);
         entity.simulated.set(false);
+        entity.collidable.set(true);
+        entity.owner.set(this.wrapper.world.getServerPlayer());
+        entity.color.set(OColor.White);
+        entity.visible.set(true);
+        entity.tags.set([]);
         await OUtils.waitFor(this.wrapper, () => !entity.simulated.get());
         this.availableCount++;
-        entity.tags.set([]);
+        pEntity.isUse = false;
+        pEntity.isReady = true;
+        pEntity.lastUse = Date.now();
         this.updateUI();
     }
 
@@ -62,17 +79,15 @@ export class OPoolManager {
         for (const child of children) {
             if (count++ >= this.maxCount) { break; }
             const pEntity = new OPoolEntity(child);
-            await this.prepare(pEntity.entity);
+            await this.prepare(pEntity);
             this.pool.push(pEntity);
-            pEntity.isUse = false;
         }
     }
 
     public async release(entity: hz.Entity) {
         const pEntity = this.pool.find(p => p.entity == entity);
-        if (pEntity) {
-            await this.prepare(entity);
-            pEntity.isUse = false;
+        if (pEntity && pEntity.isUse) {
+            await this.prepare(pEntity);
         }
     }
     
@@ -82,13 +97,13 @@ export class OPoolManager {
 
     private updateUI() {
         const usedCount = this.pool.length - this.availableCount;
-        this.wrapper.component.sendNetworkBroadcastEvent(UpdateUIBar, {
-            id: 'Dynamic',
-            percent: usedCount/this.pool.length,
-            text: `Used : ${usedCount}/${this.pool.length}`
+        this.wrapper.component.sendNetworkBroadcastEvent(OuiProgressEvent, {
+            id: 'DynamicLoading',
+            percent: usedCount/this.pool.length*100,
+            text: `${usedCount}/${this.pool.length}`
         });
-        this.wrapper.component.sendNetworkBroadcastEvent(UpdateUIBar, {
-            id: 'Static', percent: 0, text: `Static : ${this.staticCount}`
-        });
+        // this.wrapper.component.sendNetworkBroadcastEvent(UpdateUIBar, {
+        //     id: 'Static', percent: 0, text: `Static : ${this.staticCount}`
+        // });
     }
 }

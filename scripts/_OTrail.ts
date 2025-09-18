@@ -24,6 +24,7 @@ export class OTrail {
         if (available) {
             available.inUse = true;
             available.followEntity = oEntity;
+            available.trail.stop();
             this.wrapper.component.async.setTimeout(() => available?.trail.play(), 100);
         }
     }
@@ -33,7 +34,7 @@ export class OTrail {
         if (trail) {
             trail.followEntity = undefined;
             this.wrapper.component.async.setTimeout(() => trail.trail.stop() , trail.duration * 1000);
-            this.wrapper.component.async.setTimeout(() => trail.inUse = false, 100);
+            this.wrapper.component.async.setTimeout(() => trail.inUse = false, trail.duration * 1100);
         }
     }
     

@@ -4,7 +4,7 @@ import { BranchSettings, TreeSettings } from "_TreeSettings";
 import { TreeArchitecture } from "_TreeArchitecture";
 import { TreeTropisms } from "_TreeTropisms";
 import { TreeLeaves } from "_TreeLeaves";
-import { OEntity } from "_OEntity";
+import { Ease, OEntity } from "_OEntity";
 import { ORandom } from "_ORandom";
 import { ORaycast } from "_ORaycast";
 import { OWrapper } from "_OWrapper";
@@ -158,6 +158,72 @@ export class TreeGrowth {
         return false;
     }
 
+    private async harvest(bud: Bud) {
+        for (let i = 0; i < bud.oEntityList.length; i++) {
+            const oEntityFall = bud.oEntityList[i];
+            if (oEntityFall.isStatic) {
+                const position = oEntityFall.position.clone();
+                const rotation = oEntityFall.rotation.clone();
+                const scale = oEntityFall.scale.clone();
+
+                if (oEntityFall.makeDynamic()) {
+                    oEntityFall.tweenTo({
+                        duration: 0.4,
+                        position: position.add(rotation.forward.mul(0.5)),
+                        scale: new hz.Vec3(0.5, 0.5, 0.1),
+                        color: OColor.Orange,
+                        makeStatic: false
+                    }).then(() => {
+                        oEntityFall.makePhysic();
+                        oEntityFall.isCollectible = true;
+                    })
+                    const oEntityNew = this.manager.create();
+                    oEntityNew.position = position;
+                    oEntityNew.rotation = rotation;
+                    oEntityNew.scale = hz.Vec3.zero;
+                    if (oEntityNew.makeDynamic()) {
+                        oEntityNew.color = OColor.LightGreen;
+                        oEntityNew.scaleZeroTo(scale, this.random.range(60, 120), true, Ease.linear)
+                        bud.oEntityList[i] = oEntityNew;
+                    } else {
+                        this.manager.delete(oEntityNew);
+                    }
+                }
+            }
+        }
+
+        // for (const oEntity of bud.oEntityList) {
+        //     if (oEntity.isTweening() || oEntity.isInvisible) continue;            
+        //     const collectible = this.manager.create();
+        //     collectible.position = oEntity.position;
+        //     collectible.rotation = oEntity.rotation;
+        //     collectible.scale = oEntity.scale;
+        //     collectible.color = oEntity.color;
+        //     collectible.isCollectible = true;
+        //     if (collectible.makeDynamic()) {
+        //         oEntity.makeInvisible();
+        //         collectible.makePhysic();
+        //         collectible.tweenTo({
+        //             duration: 1,
+        //             scale: new hz.Vec3(0.5, 0.5, 0.1),
+        //             color: OColor.Orange,
+        //             makeStatic: false
+        //         }).then(() => {
+        //             oEntity.makeDynamic();
+        //             const scale = oEntity.scale;
+        //             oEntity.scale = hz.Vec3.zero;
+        //             oEntity.scaleZeroTo(scale, this.random.range(60, 120), true, Ease.linear);
+        //         })
+        //     } else {
+        //         this.manager.delete(oEntity);
+        //     }
+        // }
+        // bud.oEntityList = [];
+        for (const child of bud.children) {
+            this.harvest(child);
+        }
+    }
+
     private async createSegment(bud: Bud, direction: hz.Vec3): Promise<void> {
         if (bud.isPruned || this.isPrunedParent(bud)) return;
         if (this.raycast.cast(bud.position, this.tropisms.sunDir(), bud.length * 4)) {
@@ -177,21 +243,27 @@ export class TreeGrowth {
 
                 bud.oEntity.position = bud.position;
                 bud.oEntity.rotation = hz.Quaternion.lookRotation(forward);
-                bud.oEntity.scale = new hz.Vec3(width, width, bud.length);
+                bud.oEntity.scale = hz.Vec3.zero;
                 bud.oEntity.color = OColor.Black;
-                bud.oEntityList.push(bud.oEntity);
+                // bud.oEntityList.push(bud.oEntity);
                 this.budMap.set(bud.oEntity, bud);
                 bud.oEntity.setTags(['Branch']);
-                bud.oEntity.scaleZeroTo(bud.oEntity.scale, this.random.range(2, 7))
+                bud.oEntity.tweenTo({
+                    duration: this.random.range(2, 7),
+                    scale: new hz.Vec3(width, width, bud.length),
+                    makeStatic: true,
+                    ease: Ease.cubicOut
+                })
                 .then(() => {
                     this.leaves.placeLeaves(bud, direction);
                     this.enqueueSegment(bud, direction, nextPosition);
                 });
 
                 if (bud === this.budRoot) {
-                    const dispose = InteractableRegistry.I.addInline(this.budRoot.oEntity!, (player) => {
-                        this.prune(this.budRoot.oEntity?.entity ?? this.budRoot.oEntity?.staticProxy!);
-                        dispose();
+                    const dispose = InteractableRegistry.I.add(this.budRoot.oEntity!, (player) => {
+                        // this.prune(this.budRoot.oEntity?.entity ?? this.budRoot.oEntity?.staticProxy!);
+                        this.harvest(this.budRoot);
+                        // dispose();
                     });
                 }
             }

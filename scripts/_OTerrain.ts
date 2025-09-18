@@ -1,7 +1,7 @@
 import * as hz from "horizon/core";
 import "./_OMath";
 import { OUtils } from "_OUtils";
-import { OEntity } from "_OEntity";
+import { Ease, OEntity } from "_OEntity";
 import { OWrapper } from "_OWrapper";
 import { ORandom } from "_ORandom";
 import { OEntityManager } from "_OEntityManager";
@@ -9,11 +9,14 @@ import { OEvent } from "_OEvent";
 import { OColor } from "_OColor";
 import { OuiProgressEvent } from "_OuiProgress";
 import { OuiMapEvent } from "_OuiMap";
+import { OInventoryManager } from "_OInventory";
+import { InteractableRegistry } from "_OTriggerPool";
 
 class Cell {
     public oEntity: OEntity | undefined;
+    public created: boolean = false;
+    public unlocked: boolean = false;
     public discovered: boolean = false;
-    public instanciated: boolean = false;
 
     // neighbors
     public neighbors4: Cell[] = [];
@@ -38,84 +41,89 @@ export class OTerrain {
     private cellByGrid = new Map<string, Cell>();
     private key = (x: number, z: number) => `${x},${z}`;
 
-    private owner!: OEntity;
-
     constructor(
         private wrapper: OWrapper,
         private manager: OEntityManager,
+        private inventory: OInventoryManager,
         private random: ORandom,
         private gridSize: number,
         private cellSize: number
     ) {
         this.create();
+        this.updateUI();
         wrapper.onUpdate(() => this.update());
     }
 
     private update() {
         for (const cell of this.cellArray) {
-            const distance = this.minPlayerDistance(cell.position);
-            if (!cell.oEntity) {
+            const result = OUtils.closestPlayer(this.wrapper, cell.position);
+            const inRange = result.distance < this.discoverRange;
+
+            if (!cell.created && inRange) {
                 cell.oEntity = this.manager.create()
-                if (!this.owner) {
-                    this.owner = cell.oEntity;
-                }
-            } else if (!cell.discovered && distance < this.discoverRange) {
-                cell.oEntity.scale = cell.scale;
-                cell.oEntity.color = cell.color;
                 cell.oEntity.position = cell.position;
                 cell.oEntity.rotation = cell.rotation;
-                if (cell.oEntity.makeDynamic() || cell.oEntity.entity) {
+                cell.oEntity.color = OColor.Grey;
+                cell.oEntity.setTags(['Terrain']);
+                if (cell.oEntity.makeDynamic()) {
                     cell.oEntity.playMelody();
-                    cell.discovered = true;
-                    cell.oEntity.color = OColor.DarkGreen;
-                    cell.oEntity.setTags(['Terrain']);
-                    cell.oEntity.cancelTweens();
-                    cell.oEntity.scaleZeroTo(cell.scale, 0.8)
-                    .then(() => {
-                        this.wrapper.component.sendNetworkBroadcastEvent(OEvent.onTerrainSpawn, { entity: cell.oEntity?.entity! });
-                    });
-                    for (const neighbor of cell.neighbors4) {
-                        if (!neighbor.instanciated && !neighbor.discovered) {
-                            if (!neighbor.oEntity) continue;
-                            neighbor.oEntity.position = neighbor.position;
-                            neighbor.oEntity.rotation = neighbor.rotation;
-                            neighbor.oEntity.scale = neighbor.scale.mul(0.5);
-                            neighbor.oEntity.color = OColor.LightGreen;
-                            if (neighbor.oEntity.makeDynamic()) {
-                                neighbor.instanciated = true;
-                                neighbor.oEntity.setTags(['Terrain']);
-                                neighbor.oEntity.scaleZeroTo(neighbor.oEntity!.scale, 0.6, false);
+                    cell.created = true;
+                    cell.oEntity.scaleZeroTo(cell.scale.mul(0.5), 0.8, true);
+                    const dispose = InteractableRegistry.I.add(cell.oEntity, (player) => {
+                        const inventory = this.inventory.get(player);
+                        if (inventory?.has(1)) {
+                            if (player.isGrounded) {
+                                // player.applyForce(hz.Vec3.up.mul(10));
                             }
+                            cell.unlocked = true;
+                            dispose();
+                            this.updateUI();
                         }
+                    });
+                } else {
+                    this.manager.delete(cell.oEntity);
+                }
+            } else if (cell.unlocked && !cell.discovered) {
+                const inventory = this.inventory.get(result.player); // TODO  : ATENTION get the closest player not the one interacting
+                const unlockedCellList = [cell]//, ...cell.neighbors8];
+                
+                let index = 0;
+                for (const unlockedCell of unlockedCellList) {
+                    if (inventory?.has(1 + index) && !unlockedCell.discovered) {
+                        unlockedCell.discovered = true;
+                        // unlockedCell.unlocked = true;
+                        this.wrapper.component.async.setTimeout(() => {
+                            inventory.consume(1, unlockedCell.position, unlockedCell.rotation, unlockedCell.scale);
+                            if (unlockedCell.oEntity) {
+                                unlockedCell.oEntity.position = unlockedCell.position;
+                                unlockedCell.oEntity.rotation = unlockedCell.rotation;
+                                unlockedCell.oEntity.scale = unlockedCell.scale.mul(0.5);
+                                unlockedCell.oEntity.color = OColor.Grey;
+                                unlockedCell.oEntity.setTags(['Terrain']);
+                                if (unlockedCell.oEntity.makeDynamic()) {
+                                    unlockedCell.oEntity.playMelody();
+                                    unlockedCell.oEntity.tweenTo({
+                                        duration: 0.4,
+                                        scale: unlockedCell.scale,
+                                        color: OColor.DarkGreen,
+                                        ease: Ease.quadInOut,
+                                        delay: 1.3,
+                                        makeStatic: false
+                                    }).then(() => {
+                                        unlockedCell.oEntity!.color = OColor.DarkGreen; // TODO: Why the ending color is not the right one
+                                        unlockedCell.oEntity!.makeStatic();
+                                        this.wrapper.component.sendNetworkBroadcastEvent(OEvent.onTerrainSpawn,
+                                            { entity: unlockedCell.oEntity?.entity! });
+                                    });
+                                    InteractableRegistry.I.delete(unlockedCell.oEntity!);
+                                    this.updateUI();
+                                }
+                            }
+                        }, index++ * 200);
                     }
-                    this.updateUI();
                 }
             }
-            // else if (!cell.discovered && !cell.instanciated) {
-            //   cell.oEntity.position = cell.position;
-            //   cell.oEntity.rotation = cell.rotation;
-            //   cell.oEntity.scale = cell.scale;
-            //   cell.oEntity.color = OColor.Grey;
-            //   if (cell.oEntity.makeDynamic()) {
-            //     cell.instanciated = true;
-            //     cell.oEntity.setTags(['Terrain']);
-            //     cell.oEntity.scaleZeroTo(cell.oEntity.scale, 0.8)
-            //   }
-            // }
         }
-    }
-
-    private minPlayerDistance(position: hz.Vec3) {
-        const playerList = this.wrapper.world.getPlayers();
-        let minDistance = Number.MAX_VALUE;
-        for (const player of playerList) {
-            const playerPosition = player.position.get();
-            const distance = playerPosition.distance(position);
-            if (distance < minDistance) {
-                minDistance = distance;
-            }
-        }
-        return minDistance;
     }
 
     private async create() {
@@ -186,15 +194,16 @@ export class OTerrain {
         }
     }
 
-    private buildMapStr(glyph = '.', spacer = ' '): string {
+    private buildMapStr(): string {
         let str: string = '';
         for (let x = 0; x < this.gridSize; x++) {
             for (let z = 0; z < this.gridSize; z++) {
                 const cell = this.cellByGrid.get(this.key(x, z));
-                str += cell && !cell?.discovered ? glyph : spacer;
+                str += !cell ? ' ' : cell.discovered ? '•' : '·';
             }
             str += '.\n';
         }
+        // prevent horizon wrapping
         for (let x = 0; x < this.gridSize; x++) {
             for (let z = 0; z < this.gridSize; z++) {
                 str += '.'

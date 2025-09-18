@@ -37,16 +37,24 @@ export class OEntityManager {
     }
 
     public delete(oEntity: OEntity) {
-        if (this.allList.includes(oEntity)) {
-            this.allList.slice(this.allList.indexOf(oEntity));
-        }
+        const idx = this.allList.indexOf(oEntity);
+        if (idx !== -1) this.allList.splice(idx, 1);
     }
 
     private update(dt: number) {
         const player = this.wrapper.world.getPlayers()[0];
         const position = player.position.get();
         for (const oEntity of this.allList) {
-            oEntity.isUpdated = position.distanceSquared(oEntity.position) < 100;
+            for (const otherEntity of this.allList) {
+                if (oEntity != otherEntity) {
+                    if (oEntity.entity && otherEntity.entity) {
+                        if (oEntity.entity == otherEntity.entity) {
+                            console.error(`${oEntity.tags.join(',')} /!\\ ${otherEntity.tags.join(',')}`);
+                        }
+                    }
+                }
+            }
+            // oEntity.isUpdated = position.distanceSquared(oEntity.position) < 100;
             this.fallingObject(oEntity);
             // this.sleepPhysics(oEntity, dt);
         }
@@ -55,6 +63,7 @@ export class OEntityManager {
     public fallingObject(oEntity: OEntity) {
         if (oEntity.position.y < -10) {
             oEntity.makeInvisible();
+            this.delete(oEntity);
         }
     }
 

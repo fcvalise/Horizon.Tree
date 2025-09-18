@@ -27,7 +27,7 @@ class OuiProgress extends UIComponent<typeof OuiProgress> {
     cornerRadius: { type: hz.PropTypes.Number, default: 20 },
   };
 
-  private hudItem(progressBar: Binding<string>, progressValue: Binding<string>) {
+  private hudItem(progressBar: Binding<string>, progressText: Binding<string>) {
     return [
       View({
         children: [
@@ -42,7 +42,7 @@ class OuiProgress extends UIComponent<typeof OuiProgress> {
           }),
           // Label
           Text({
-            text: progressValue,
+            text: progressText,
             style: {
               fontFamily: "Roboto",
               fontSize: 24,
@@ -105,9 +105,10 @@ class OuiProgress extends UIComponent<typeof OuiProgress> {
     if (!this.props.enabled) return;
 
     this.connectNetworkBroadcastEvent(OuiProgressEvent, (data) => {
+      
       if (this.entity.tags.contains(data.id)) {
         this.progressBar.set(`${data.percent}%`);
-        this.progressText.set(`${data.text}`);
+        this.progressText.set(data.text);
       }
     });
   }
