@@ -1,5 +1,6 @@
 import { OEntity } from "_OEntity";
 import * as hz from "horizon/core";
+import { MeshEntity } from "horizon/core";
 
 export class Interactable {
   constructor(public oEntity: OEntity, public interact: (player: hz.Player) => void) { }
@@ -45,8 +46,8 @@ export class InteractableRegistry {
 
 
 class OTriggerPool extends hz.Component<typeof OTriggerPool> {
-  private searchRadius = 6;
-  private activateRadius = 2;
+  private searchRadius = 8;
+  private activateRadius = 3;
   private tickSeconds = 0.2;
   private triggerPool: hz.Entity[] = [];
   private triggerToInteractable = new Map<hz.Entity, Interactable>();
@@ -67,43 +68,57 @@ class OTriggerPool extends hz.Component<typeof OTriggerPool> {
   private updatePool() {
     const players = this.world.getPlayers() as hz.Player[];
     if (!players.length || !this.triggerPool.length) return;
-    const candidateList: { interactable: Interactable; distance: number; playerPosition: hz.Vec3 }[] = [];
+
+    const candidates: {
+      interactable: Interactable;
+      distance: number;
+      closestPlayer: hz.Player;
+    }[] = [];
 
     InteractableRegistry.I.forEach((interactable) => {
+      if (!interactable?.oEntity) return;
+
       let closestDistance = Infinity;
-      let closestPlayerPosition = players[0].position.get();
+      let closestPlayer = players[0];
 
       for (let i = 0; i < players.length; i++) {
-        const playerPosition = players[i].position.get();
-        const distance = interactable.oEntity.position.distance(playerPosition);
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestPlayerPosition = playerPosition;
+        const player = players[i];
+        const dist = interactable.oEntity.position.distance(player.position.get());
+        if (dist < closestDistance) {
+          closestDistance = dist;
+          closestPlayer = player;
         }
-        if (closestDistance <= this.activateRadius) {
-          interactable.interact(players[i]);
-        }
+      }
+
+      if (closestDistance <= this.activateRadius) {
+        interactable.interact(closestPlayer);
       }
 
       if (closestDistance <= this.searchRadius) {
-        candidateList.push({ interactable, distance: closestDistance, playerPosition: closestPlayerPosition });
+        candidates.push({ interactable, distance: closestDistance, closestPlayer });
       }
     });
 
-    candidateList.sort((a, b) => a.distance - b.distance);
+    candidates.sort((a, b) => a.distance - b.distance);
 
-    const assignedCount = Math.min(this.triggerPool.length, candidateList.length);
+    const assignedCount = Math.min(this.triggerPool.length, candidates.length);
     for (let i = 0; i < this.triggerPool.length; i++) {
       const triggerEntity = this.triggerPool[i];
 
       if (i < assignedCount) {
-        const candidate = candidateList[i];
+        const candidate = candidates[i];
         const oEntity = candidate.interactable.oEntity;
-        const position = oEntity.position;
-        const targetPosition = position;//.add(oEntity.rotation.forward.mul(oEntity.scale.z * 0.5));
+        const meshEntity = triggerEntity.children.get()[0].as(MeshEntity);
+
+        if (meshEntity) {
+          meshEntity.style.tintColor.set(oEntity.color);
+          meshEntity.scale.set(new hz.Vec3(0.5, 0.5, 0.2));
+        }
+
+        triggerEntity.position.set(oEntity.position);
+        triggerEntity.rotation.set(oEntity.rotation);
 
         this.triggerToInteractable.set(triggerEntity, candidate.interactable);
-        triggerEntity.position.set(targetPosition);
       } else {
         this.triggerToInteractable.delete(triggerEntity);
         triggerEntity.position.set(new hz.Vec3(0, -999, 0));

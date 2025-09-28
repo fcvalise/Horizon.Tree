@@ -61,7 +61,7 @@ export class OTerrain {
 
             if (!cell.created && inRange) {
                 cell.oEntity = this.manager.create()
-                cell.oEntity.position = cell.position;
+                cell.oEntity.position = cell.position.add(this.random.vector());
                 cell.oEntity.rotation = cell.rotation;
                 cell.oEntity.color = OColor.Grey;
                 cell.oEntity.setTags(['Terrain']);
@@ -93,9 +93,8 @@ export class OTerrain {
                         unlockedCell.discovered = true;
                         // unlockedCell.unlocked = true;
                         this.wrapper.component.async.setTimeout(() => {
-                            inventory.consume(1, unlockedCell.position, unlockedCell.rotation, unlockedCell.scale);
                             if (unlockedCell.oEntity) {
-                                unlockedCell.oEntity.position = unlockedCell.position;
+                                inventory.consume(1, unlockedCell.oEntity!);
                                 unlockedCell.oEntity.rotation = unlockedCell.rotation;
                                 unlockedCell.oEntity.scale = unlockedCell.scale.mul(0.5);
                                 unlockedCell.oEntity.color = OColor.Grey;
@@ -104,6 +103,7 @@ export class OTerrain {
                                     unlockedCell.oEntity.playMelody();
                                     unlockedCell.oEntity.tweenTo({
                                         duration: 0.4,
+                                        position: unlockedCell.position,
                                         scale: unlockedCell.scale,
                                         color: OColor.DarkGreen,
                                         ease: Ease.quadInOut,

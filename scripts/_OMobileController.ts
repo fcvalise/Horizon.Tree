@@ -69,12 +69,12 @@ export class OMobileController {
         // this.player.focusedInteraction.setTapOptions();
         // this.player.focusedInteraction.setTrailOptions();
         LocalCamera.collisionEnabled.set(false);
-        LocalCamera.setCameraModePan({ positionOffset: new hz.Vec3(10, 10, 0) });
+        LocalCamera.setCameraModePan({ positionOffset: new hz.Vec3(15, 15, 0) });
     }
 
     private registerExit() {
         this.focus.onFocusExited((player) => {
-            LocalCamera.setCameraModePan({ positionOffset: new hz.Vec3(10, 10, 0) });
+            LocalCamera.setCameraModePan({ positionOffset: new hz.Vec3(15, 15, 0) });
         });
     }
 

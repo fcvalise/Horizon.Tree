@@ -168,8 +168,8 @@ export class TreeGrowth {
 
                 if (oEntityFall.makeDynamic()) {
                     oEntityFall.tweenTo({
-                        duration: 0.4,
-                        position: position.add(rotation.forward.mul(0.5)),
+                        duration: 0.2,
+                        position: position.add(rotation.forward.mul(0.1)),
                         scale: new hz.Vec3(0.5, 0.5, 0.1),
                         color: OColor.Orange,
                         makeStatic: false
@@ -177,17 +177,18 @@ export class TreeGrowth {
                         oEntityFall.makePhysic();
                         oEntityFall.isCollectible = true;
                     })
-                    const oEntityNew = this.manager.create();
-                    oEntityNew.position = position;
-                    oEntityNew.rotation = rotation;
-                    oEntityNew.scale = hz.Vec3.zero;
-                    if (oEntityNew.makeDynamic()) {
-                        oEntityNew.color = OColor.LightGreen;
-                        oEntityNew.scaleZeroTo(scale, this.random.range(60, 120), true, Ease.linear)
-                        bud.oEntityList[i] = oEntityNew;
-                    } else {
-                        this.manager.delete(oEntityNew);
-                    }
+                    // Create new leaf
+                    // const oEntityNew = this.manager.create();
+                    // oEntityNew.position = position;
+                    // oEntityNew.rotation = rotation;
+                    // oEntityNew.scale = hz.Vec3.zero;
+                    // if (oEntityNew.makeDynamic()) {
+                    //     oEntityNew.color = OColor.LightGreen;
+                    //     oEntityNew.scaleZeroTo(scale, this.random.range(60, 120), true, Ease.linear)
+                    //     bud.oEntityList[i] = oEntityNew;
+                    // } else {
+                    //     this.manager.delete(oEntityNew);
+                    // }
                 }
             }
         }

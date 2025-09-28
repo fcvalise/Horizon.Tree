@@ -305,6 +305,7 @@ interface TweenArgs {
   rotation?: hz.Quaternion;
   rotationGetter?: () => hz.Quaternion;
   scale?: hz.Vec3;
+  scaleGetter?: () => hz.Vec3;
   color?: hz.Color;
   duration: number;
   delay?: number;
@@ -389,14 +390,19 @@ OEntity.prototype.tweenTo = function (args: TweenArgs): Promise<void> {
           ? args.rotationGetter()
           : staticEndRotation;
 
+      const currentTargetScale =
+        typeof args.scaleGetter === "function"
+          ? args.scaleGetter()
+          : staticEndScale;
+
       if (args.position || args.positionGetter) {
         this.position = vec3Lerp(startPosition, currentTargetPosition, k);
       }
       if (args.rotation || args.rotationGetter) {
         this.rotation = quatSlerp(startRotation, currentTargetRotation, k);
       }
-      if (args.scale) {
-        this.scale = vec3Lerp(startScale, staticEndScale, k);
+      if (args.scale || args.scaleGetter) {
+        this.scale = vec3Lerp(startScale, currentTargetScale, k);
       }
       if (args.color) {
         this.color = colorLerp(startColor, staticEndColor, k);
@@ -406,7 +412,7 @@ OEntity.prototype.tweenTo = function (args: TweenArgs): Promise<void> {
         // Snap to exact end values at completion.
         if (args.position || args.positionGetter) this.position = currentTargetPosition.clone();
         if (args.rotation || args.rotationGetter) this.rotation = currentTargetRotation.clone();
-        if (args.scale) this.scale = staticEndScale.clone();
+        if (args.scale || args.scaleGetter) this.scale = staticEndScale.clone();
         if (args.color) this.color = staticEndColor.clone();
         if (makeStatic) this.makeStatic();
 

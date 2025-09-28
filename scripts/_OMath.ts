@@ -11,6 +11,7 @@ declare global {
   interface Number {
     toRadians(): number;
     toDegrees(): number;
+    clamp(a: number, b: number): number;
     clamp01(): number;
   }
 }
@@ -32,6 +33,11 @@ Number.prototype.clamp01 = function (): number {
   if (v < 0) return 0;
   if (v > 1) return 1;
   return v;
+};
+
+Number.prototype.clamp = function (a: number, b: number): number {
+  const v = this as number;
+  return Math.max(a, Math.min(b, v));
 };
 
 

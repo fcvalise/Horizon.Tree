@@ -10,8 +10,11 @@ export class OEntityManager {
     private readonly preSleepDuration = 0.3;
     public sleepList: OEntity[] = [];
 
+    private readonly isDebug = false;
+
     constructor(private wrapper: OWrapper, private pool: OPoolManager) {
         this.wrapper.onUpdate((dt) => this.update(dt));
+        this.logDebug();
     }
 
     public hasAvailable(): boolean {
@@ -38,22 +41,23 @@ export class OEntityManager {
 
     public delete(oEntity: OEntity) {
         const idx = this.allList.indexOf(oEntity);
-        if (idx !== -1) this.allList.splice(idx, 1);
+        if (idx !== -1) {
+            if (oEntity.entity) {
+                oEntity.cancelTweens();
+                this.pool.release(oEntity.entity);
+            }
+            this.allList.splice(idx, 1);
+        }
+        this.physicsPreSleepTimer.delete(oEntity);
+        const sleepIdx = this.sleepList.indexOf(oEntity);
+        if (sleepIdx !== -1) this.sleepList.splice(sleepIdx, 1);
     }
 
     private update(dt: number) {
-        const player = this.wrapper.world.getPlayers()[0];
-        const position = player.position.get();
+        // const player = this.wrapper.world.getPlayers()[0];
+        // const position = player.position.get();
+
         for (const oEntity of this.allList) {
-            for (const otherEntity of this.allList) {
-                if (oEntity != otherEntity) {
-                    if (oEntity.entity && otherEntity.entity) {
-                        if (oEntity.entity == otherEntity.entity) {
-                            console.error(`${oEntity.tags.join(',')} /!\\ ${otherEntity.tags.join(',')}`);
-                        }
-                    }
-                }
-            }
             // oEntity.isUpdated = position.distanceSquared(oEntity.position) < 100;
             this.fallingObject(oEntity);
             // this.sleepPhysics(oEntity, dt);
@@ -92,5 +96,44 @@ export class OEntityManager {
                 this.physicsPreSleepTimer.set(oEntity, timer);
             }
         }
+    }
+
+    private logDebug() {
+        if (!this.isDebug) return;
+        this.wrapper.component.async.setInterval(() => {
+            const tagCounts: Record<string, number> = {};
+            for (const oe of this.allList) {
+                for (const tag of oe.tags) {
+                    if (oe.isDynamic) {
+                        tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
+                    }
+                }
+            }
+            // Check lost pool entity
+            let lostCount = 0;
+            for (const p of this.pool.getPool()) {
+                const oe = this.allList.find(oe => oe.entity == p.entity);
+                if (p.isUse && !oe) {
+                    lostCount++;
+                    // this.pool.release(p.entity);
+                }
+            }
+            const parts = Object.entries(tagCounts).map(([tag, count]) => `${tag[0]}:${count}`);
+            console.log(`OEManager (${parts.join("|")}) Lost : ${lostCount}`);
+
+            
+            // Check duplicates
+        for (const oEntity of this.allList) {
+                for (const otherEntity of this.allList) {
+                    if (oEntity != otherEntity) {
+                        if (oEntity.entity && otherEntity.entity) {
+                            if (oEntity.entity == otherEntity.entity) {
+                                console.error(`${oEntity.tags.join(',')} /!\\ ${otherEntity.tags.join(',')}`);
+                            }
+                        }
+                    }
+                }
+            }
+        }, 1000)
     }
 }

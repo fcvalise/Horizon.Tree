@@ -47,8 +47,6 @@ export class OisifManager {
         //     }
         // })
 
-        new TreeBase(this.wrapper, this.manager, new hz.Vec3(2.16, 2.25, 3.46));
-
         this.wrapper.component.connectNetworkBroadcastEvent(OEvent.onTerrainSpawn, (payload) => {
             if (this.random.bool(0.4)) {
                 const tree = new TreeBase(this.wrapper, this.manager, payload.entity.position.get());

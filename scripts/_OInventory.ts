@@ -25,7 +25,6 @@ export class OInventoryManager {
   private update() {
     const players = this.wrapper.world.getPlayers();
 
-    // NOTE: For scale, consider tracking only "collectible" entities in a Set.
     for (const oEntity of [...this.manager.allList]) {
       if (!oEntity.isCollectible) continue;
 
@@ -35,7 +34,6 @@ export class OInventoryManager {
         if (!isCloseEnough) continue;
 
         this.get(player)?.attach(oEntity);
-        this.manager.delete(oEntity);
         break;
       }
     }
@@ -48,6 +46,7 @@ export class OInventoryManager {
 
 export class OInventory {
   private readonly startCount: number = 16;
+  private readonly maxCount: number = 20;
   private readonly socketStepY = 0.15;
   private readonly socketBase = new hz.Vec3(0, 0, -0.5);
 
@@ -75,7 +74,7 @@ export class OInventory {
       oEntity.scaleZeroTo(oEntity.scale, 1, false).then(() => {
         this.createAttachable(oEntity);
         this.rebuildSockets();
-        this.updateUI();
+        // this.updateUI();
       });
     } else {
       this.manager.delete(oEntity);
@@ -124,67 +123,60 @@ export class OInventory {
     return this.oEntityList.filter(oe => !oe.isTweening()).length >= count;
   }
 
-  public async consume(count: number, position: hz.Vec3, rotation: hz.Quaternion, scale: hz.Vec3) {
+  public async consume(count: number, oEntityTarget: OEntity) {
     let taken = 0;
 
     while (taken < count) {
       const idx = this.oEntityList.findIndex(e => !e.isTweening());
       if (idx === -1) break;
+      const positionGetter = () => oEntityTarget.position;
+      const scaleGetter = () => oEntityTarget.scale;
 
-      const rotationGetter = () => hz.Quaternion.lookRotation(this.player.up.get().add(this.player.forward.get()).mul(-1));
       // const oEntity = this.oEntityList.shift()!;
       const oEntity = this.oEntityList.pop()!;
-      oEntity.rotation = rotationGetter();
-
-      oEntity.playMelody();
-      await oEntity.tweenTo({
-        duration: 0.1,
-        scale: hz.Vec3.one,
-        // rotationGetter: rotationGetter,
-        color: OColor.Blue,
-        ease: Ease.cubicOut,
-        makeStatic: false,
-      })
+      oEntity.position = oEntityTarget.position.clone();
+      oEntity.rotation = oEntityTarget.rotation.clone();
 
       const attachable = oEntity.entity?.as(hz.AttachableEntity);
       attachable?.detach();
-      oEntity.enableTrail(true);
 
       if (oEntity.entity) {
         oEntity.position = oEntity.entity.position.get();
-        oEntity.rotation = oEntity.entity.rotation.get();
-        oEntity.scale = hz.Vec3.one;
+        oEntity.rotation = oEntityTarget.rotation;
+        oEntity.scale = new hz.Vec3(0.5, 0.5, 0.1);
       }
 
       oEntity.playMelody();
       await oEntity.tweenTo({
-        duration: 0.1,
+        duration: 0.4,
+        position: oEntityTarget.position,
+        rotation: oEntityTarget.rotation,
+        ease: Ease.cubicOut,
+        makeStatic: false,
+      })
+
+      const baseRot = oEntityTarget.rotation;
+      const delta = hz.Quaternion.fromAxisAngle(baseRot.forward, Math.PI);
+      const finalRot = delta.mul(baseRot);
+      
+      oEntity.playMelody();
+      await oEntity.tweenTo({
+        duration: 0.5,
+        positionGetter: () => positionGetter().add(hz.Vec3.up.mul(3.5)),
+        rotation: finalRot,
         scale: new hz.Vec3(0.5, 0.5, 0.1),
-        position: oEntity.position.add(hz.Vec3.up.mul(1)),
         color: OColor.Blue,
         ease: Ease.cubicOut,
         makeStatic: false,
       })
+      oEntity.enableTrail(true);
 
       oEntity.playMelody();
       await oEntity.tweenTo({
         duration: 0.8,
-        position: position.add(hz.Vec3.up.mul(3.5)),
-        rotation: hz.Quaternion.lookRotation(hz.Vec3.up),
-        scale: new hz.Vec3(1, 1, 0.1),
-        ease: Ease.cubicOut,
-        makeStatic: false,
-      })
-
-      // prevent weird rotation
-      oEntity.rotation = hz.Quaternion.lookRotation(hz.Vec3.up.mul(-1));
-
-      oEntity.playMelody();
-      await oEntity.tweenTo({
-        duration: 0.8,
-        rotation: rotation,
-        position: position.add(hz.Vec3.up.mul(0.01)),
-        scale: scale.mul(1),
+        rotation: oEntityTarget.rotation,
+        positionGetter: positionGetter,
+        scaleGetter: scaleGetter,
         color: OColor.DarkGreen,
         ease: Ease.easeInQuart,
         makeStatic: false,
@@ -193,9 +185,9 @@ export class OInventory {
       oEntity.playMelody();
       await oEntity.tweenTo({
         duration: 0.8,
-        rotation: rotation,
-        position: position.add(hz.Vec3.up.mul(0.01)),
-        scale: scale.mul(1),
+        rotation: oEntityTarget.rotation,
+        positionGetter: positionGetter,
+        scaleGetter: scaleGetter,
         color: OColor.DarkGreen,
         ease: Ease.easeInQuart,
         makeStatic: false,
@@ -211,27 +203,36 @@ export class OInventory {
 
     if (taken > 0) {
       this.rebuildSockets();
-      this.updateUI();
+      // this.updateUI();
     }
   }
 
-  public async attach(oEntity: OEntity) {
-    if (this.oEntityList.includes(oEntity)) return;
+  public async attach(oEntity: OEntity): Promise<boolean> {
+    if (this.oEntityList.includes(oEntity)) return false;
+    if (this.oEntityList.length >= this.maxCount) return false;
 
-    oEntity.entity?.collidable.set(false);
-    oEntity.entity?.simulated.set(true);
-    oEntity.entity?.interactionMode.set(hz.EntityInteractionMode.Grabbable);
-    oEntity.entity?.simulated.set(false);
-    oEntity.entity?.owner.set(this.player);
-    oEntity.enableTrail(true);
+    const inventoryEntity = this.manager.create();
+    inventoryEntity.position = oEntity.position;
+    inventoryEntity.rotation = oEntity.rotation;
+    inventoryEntity.scale = oEntity.scale;
+    inventoryEntity.color = oEntity.color;
+    
+    oEntity.makeInvisible();
+    this.manager.delete(oEntity)
+    
+    inventoryEntity.makeDynamic();
+    inventoryEntity.entity?.collidable.set(false);
 
-    const base = oEntity.scale.clone();
+    inventoryEntity.enableTrail(true);
+    inventoryEntity.setTags(['Money']);
+
+    const base = inventoryEntity.scale.clone();
     const index = this.socketIndex++;
     const socket = this.getSocket(index);
 
     const targetGetter = () => this.socketLocalToWorld(socket.position);
 
-    await oEntity.tweenTo({
+    await inventoryEntity.tweenTo({
       duration: 0.9,
       positionGetter: targetGetter,
       rotation: socket.rotation,
@@ -239,7 +240,7 @@ export class OInventory {
       ease: Ease.cubicOut
     });
 
-    await oEntity.tweenTo({
+    await inventoryEntity.tweenTo({
       duration: 0.12,
       positionGetter: targetGetter,
       scale: base.mul(1.15),
@@ -247,7 +248,7 @@ export class OInventory {
       ease: Ease.cubicOut,
     });
 
-    await oEntity.tweenTo({
+    await inventoryEntity.tweenTo({
       duration: 0.12,
       positionGetter: targetGetter,
       scale: base.mul(0.6),
@@ -255,11 +256,13 @@ export class OInventory {
       ease: Ease.cubicOut,
     });
 
-    this.createAttachable(oEntity);
-    this.oEntityList.push(oEntity);
+    this.createAttachable(inventoryEntity);
+    this.oEntityList.push(inventoryEntity);
 
     this.rebuildSockets();
-    this.updateUI();
+    // this.manager.delete(oEntity);
+    return true;
+    // this.updateUI();
   }
 
   private createAttachable(oEntity: OEntity) {

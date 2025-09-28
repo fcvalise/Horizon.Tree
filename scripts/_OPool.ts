@@ -20,6 +20,7 @@ export class OPoolManager {
 
     constructor(private wrapper: OWrapper) {
         this.getReserve();
+        wrapper.component.async.setInterval(() => this.updateUI(), 1000);
     }
 
     public count() {
@@ -45,7 +46,7 @@ export class OPoolManager {
             best.isUse = true;
             best.lastUse = now;
             this.availableCount = Math.max(0, this.availableCount - 1);
-            this.updateUI();
+            // this.updateUI();
             return best.entity;
         }
         return undefined;
@@ -61,15 +62,18 @@ export class OPoolManager {
         entity.simulated.set(false);
         entity.collidable.set(true);
         entity.owner.set(this.wrapper.world.getServerPlayer());
-        entity.color.set(OColor.White);
-        entity.visible.set(true);
+        // entity.color.set(OColor.White);
+        entity.simulated.set(false);
+        entity.collidable.set(true);
+        // entity.visible.set(false);
+        entity.scale.set(hz.Vec3.zero);
         entity.tags.set([]);
         await OUtils.waitFor(this.wrapper, () => !entity.simulated.get());
         this.availableCount++;
         pEntity.isUse = false;
         pEntity.isReady = true;
         pEntity.lastUse = Date.now();
-        this.updateUI();
+        // this.updateUI();
     }
 
     private async getReserve() {
@@ -85,7 +89,7 @@ export class OPoolManager {
     }
 
     public async release(entity: hz.Entity) {
-        const pEntity = this.pool.find(p => p.entity == entity);
+        const pEntity = this.pool.find(p => p.entity === entity);
         if (pEntity && pEntity.isUse) {
             await this.prepare(pEntity);
         }
@@ -96,12 +100,29 @@ export class OPoolManager {
     }
 
     private updateUI() {
-        const usedCount = this.pool.length - this.availableCount;
+        const tagCounts: Record<string, number> = {};
+        let usedCount = 0;
+
+        for (const p of this.pool) {
+            if (!p.isUse) continue;
+            usedCount++;
+
+            // Each entity may have multiple tags
+            for (const tag of p.entity.tags.get()) {
+                tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
+            }
+        }
+        const readyCount = this.pool.filter(p => p.isReady).length;
+
         this.wrapper.component.sendNetworkBroadcastEvent(OuiProgressEvent, {
             id: 'DynamicLoading',
             percent: usedCount/this.pool.length*100,
-            text: `${usedCount}/${this.pool.length}`
+            text: `${usedCount}/${this.pool.length} (${readyCount})`
         });
+
+        // const parts = Object.entries(tagCounts).map(([tag, count]) => `${tag[0]}:${count}`);
+        // console.log(`(${parts.join("|")}) (${readyCount})`);
+        
         // this.wrapper.component.sendNetworkBroadcastEvent(UpdateUIBar, {
         //     id: 'Static', percent: 0, text: `Static : ${this.staticCount}`
         // });
