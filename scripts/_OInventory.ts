@@ -111,7 +111,7 @@ export class OInventory {
   private socketLocalToWorld(local: hz.Vec3): hz.Vec3 {
     const torsoPosW = this.player.torso.getPosition(hz.Space.World);
     const f = this.player.forward.get();
-    const r = this.player.rootRotation.get().right;
+    const r = this.player.rootRotation.get().getRight();
     const u = this.player.up?.get() ?? hz.Vec3.up;
     return torsoPosW
       .add(r.mul(local.x))
@@ -156,7 +156,7 @@ export class OInventory {
       })
 
       const baseRot = oEntityTarget.rotation;
-      const delta = hz.Quaternion.fromAxisAngle(baseRot.forward, Math.PI);
+      const delta = hz.Quaternion.fromAxisAngle(baseRot.getForward(), Math.PI);
       const finalRot = delta.mul(baseRot);
       
       oEntity.playMelody();

@@ -75,6 +75,8 @@ export class OMelody {
 
   // Runtime
   private rng = new ORandom("Oisif");
+  private playerList: hz.Player[] = [];
+  private serverPlayer!: hz.Player;
   private notePool: NoteObject[] = [];
   private pending: PendingNote[] = [];
   private tickAccS = 0;
@@ -108,6 +110,8 @@ export class OMelody {
 
     // tick: update timers + quantize
     this.wrapper.onUpdate((dt) => {
+      this.playerList = this.wrapper.world.getPlayers();
+      this.serverPlayer = this.wrapper.world.getServerPlayer();
       for (const v of this.notePool) {
         if (!v.isPlaying) continue;
         v.timer += dt;
@@ -149,7 +153,7 @@ export class OMelody {
   }
 
   triggerWithTags(pos: hz.Vec3, tags: string[] | undefined) {
-    const result = OUtils.closestPlayer(this.wrapper, pos);
+    const result = OUtils.closestPlayer(this.wrapper, pos, this.playerList, this.serverPlayer);
     if (result.distance > this.maxDistance) {
       if (!this.quantize) this.flushTick();
       return;

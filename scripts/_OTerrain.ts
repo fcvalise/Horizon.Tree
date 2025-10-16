@@ -10,7 +10,7 @@ import { OColor } from "_OColor";
 import { OuiProgressEvent } from "_OuiProgress";
 import { OuiMapEvent } from "_OuiMap";
 import { OInventoryManager } from "_OInventory";
-import { InteractableRegistry } from "_OTriggerPool";
+import { OInteractableManager } from "_OInteractableManager";
 
 class Cell {
     public oEntity: OEntity | undefined;
@@ -45,6 +45,7 @@ export class OTerrain {
         private wrapper: OWrapper,
         private manager: OEntityManager,
         private inventory: OInventoryManager,
+        private interactable: OInteractableManager,
         private random: ORandom,
         private gridSize: number,
         private cellSize: number
@@ -52,11 +53,14 @@ export class OTerrain {
         this.create();
         this.updateUI();
         wrapper.onUpdate(() => this.update());
+        wrapper.component.async.setInterval(() => this.updateUI(), 1000);
     }
 
     private update() {
+        const playerList = this.wrapper.world.getPlayers();
+        const serverPlayer = this.wrapper.world.getServerPlayer();
         for (const cell of this.cellArray) {
-            const result = OUtils.closestPlayer(this.wrapper, cell.position);
+            const result = OUtils.closestPlayer(this.wrapper, cell.position, playerList, serverPlayer);
             const inRange = result.distance < this.discoverRange;
 
             if (!cell.created && inRange) {
@@ -68,59 +72,42 @@ export class OTerrain {
                 if (cell.oEntity.makeDynamic()) {
                     cell.oEntity.playMelody();
                     cell.created = true;
-                    cell.oEntity.scaleZeroTo(cell.scale.mul(0.5), 0.8, true);
-                    const dispose = InteractableRegistry.I.add(cell.oEntity, (player) => {
+                    cell.oEntity.scaleZeroTo(cell.scale.mul(0.5), 0.8, false);
+                    
+                    const dispose = this.interactable.add(cell.oEntity, (player) => {
                         const inventory = this.inventory.get(player);
-                        if (inventory?.has(1)) {
-                            if (player.isGrounded) {
-                                // player.applyForce(hz.Vec3.up.mul(10));
-                            }
+                        if (!cell.unlocked && inventory?.has(1)) {
                             cell.unlocked = true;
-                            dispose();
-                            this.updateUI();
+                            if (cell.oEntity) {
+                                inventory.consume(1, cell.oEntity!);
+                                cell.oEntity.rotation = cell.rotation;
+                                cell.oEntity.scale = cell.scale.mul(0.5);
+                                cell.oEntity.color = OColor.Grey;
+                                cell.oEntity.setTags(['Terrain']);
+                                if (cell.oEntity.makeDynamic()) {
+                                    cell.oEntity.playMelody();
+                                    cell.oEntity.tweenTo({
+                                        duration: 0.4,
+                                        position: cell.position,
+                                        scale: cell.scale,
+                                        color: OColor.DarkGreen,
+                                        ease: Ease.quadInOut,
+                                        delay: 1.3,
+                                        makeStatic: true
+                                    })
+                                    .then(() => {
+                                        cell.discovered = true;
+                                        this.wrapper.component.sendNetworkBroadcastEvent(OEvent.onTerrainSpawn,
+                                            { entity: cell.oEntity?.entity! });
+                                    });
+                                    this.interactable.delete(cell.oEntity);
+                                }
+                            }
+                            this.wrapper.component.async.setTimeout(() => dispose(), 10);
                         }
                     });
                 } else {
                     this.manager.delete(cell.oEntity);
-                }
-            } else if (cell.unlocked && !cell.discovered) {
-                const inventory = this.inventory.get(result.player); // TODO  : ATENTION get the closest player not the one interacting
-                const unlockedCellList = [cell]//, ...cell.neighbors8];
-                
-                let index = 0;
-                for (const unlockedCell of unlockedCellList) {
-                    if (inventory?.has(1 + index) && !unlockedCell.discovered) {
-                        unlockedCell.discovered = true;
-                        // unlockedCell.unlocked = true;
-                        this.wrapper.component.async.setTimeout(() => {
-                            if (unlockedCell.oEntity) {
-                                inventory.consume(1, unlockedCell.oEntity!);
-                                unlockedCell.oEntity.rotation = unlockedCell.rotation;
-                                unlockedCell.oEntity.scale = unlockedCell.scale.mul(0.5);
-                                unlockedCell.oEntity.color = OColor.Grey;
-                                unlockedCell.oEntity.setTags(['Terrain']);
-                                if (unlockedCell.oEntity.makeDynamic()) {
-                                    unlockedCell.oEntity.playMelody();
-                                    unlockedCell.oEntity.tweenTo({
-                                        duration: 0.4,
-                                        position: unlockedCell.position,
-                                        scale: unlockedCell.scale,
-                                        color: OColor.DarkGreen,
-                                        ease: Ease.quadInOut,
-                                        delay: 1.3,
-                                        makeStatic: false
-                                    }).then(() => {
-                                        unlockedCell.oEntity!.color = OColor.DarkGreen; // TODO: Why the ending color is not the right one
-                                        unlockedCell.oEntity!.makeStatic();
-                                        this.wrapper.component.sendNetworkBroadcastEvent(OEvent.onTerrainSpawn,
-                                            { entity: unlockedCell.oEntity?.entity! });
-                                    });
-                                    InteractableRegistry.I.delete(unlockedCell.oEntity!);
-                                    this.updateUI();
-                                }
-                            }
-                        }, index++ * 200);
-                    }
                 }
             }
         }

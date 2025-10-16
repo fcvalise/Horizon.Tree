@@ -8,11 +8,11 @@ import { Ease, OEntity } from "_OEntity";
 import { ORandom } from "_ORandom";
 import { ORaycast } from "_ORaycast";
 import { OWrapper } from "_OWrapper";
-import { PlayerLocal } from "_PlayerLocal";
 import { OColor } from "_OColor";
 import { OEntityManager } from "_OEntityManager";
 import { estimateTreeProgressCurrent } from "_TreeProgress";
-import { InteractableRegistry } from "_OTriggerPool";
+import { PlayerEvent } from "_PlayerEvent";
+import { OInteractableManager } from "_OInteractableManager";
 
 export type Bud = {
     position: hz.Vec3;
@@ -56,6 +56,7 @@ export class TreeGrowth {
         private position: hz.Vec3,
         private wrapper: OWrapper,
         private manager: OEntityManager,
+        private interactable: OInteractableManager,
         private treeSettings: TreeSettings,
     ) {
         this.random = new ORandom(position.x * position.z * position.y);
@@ -67,7 +68,7 @@ export class TreeGrowth {
 
         this.createRoot();
 
-        this.wrapper.component.connectNetworkBroadcastEvent(PlayerLocal.onTouch, (payload) => {
+        this.wrapper.component.connectNetworkBroadcastEvent(PlayerEvent.onTouch, (payload) => {
             this.prune(payload.hit.target);
         });
     }
@@ -167,16 +168,19 @@ export class TreeGrowth {
                 const scale = oEntityFall.scale.clone();
 
                 if (oEntityFall.makeDynamic()) {
-                    oEntityFall.tweenTo({
+                    oEntityFall.isCollectible = true;
+
+                    await oEntityFall.tweenTo({
                         duration: 0.2,
-                        position: position.add(rotation.forward.mul(0.1)),
+                        position: position.add(rotation.getForward().normalize()),
                         scale: new hz.Vec3(0.5, 0.5, 0.1),
                         color: OColor.Orange,
                         makeStatic: false
-                    }).then(() => {
+                    })//.then(() => {
                         oEntityFall.makePhysic();
                         oEntityFall.isCollectible = true;
-                    })
+                    // })
+
                     // Create new leaf
                     // const oEntityNew = this.manager.create();
                     // oEntityNew.position = position;
@@ -261,10 +265,10 @@ export class TreeGrowth {
                 });
 
                 if (bud === this.budRoot) {
-                    const dispose = InteractableRegistry.I.add(this.budRoot.oEntity!, (player) => {
+                    const dispose = this.interactable.add(this.budRoot.oEntity!, (player) => {
                         // this.prune(this.budRoot.oEntity?.entity ?? this.budRoot.oEntity?.staticProxy!);
                         this.harvest(this.budRoot);
-                        // dispose();
+                        // this.wrapper.component.async.setInterval(() => dispose(), 10);
                     });
                 }
             }

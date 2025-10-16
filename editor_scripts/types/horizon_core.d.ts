@@ -3580,6 +3580,8 @@ export declare const CodeBlockEvents: {
     OnPlayerEnteredFocusedInteraction: CodeBlockEvent<[player: Player]>;
     OnPlayerExitedFocusedInteraction: CodeBlockEvent<[player: Player]>;
     OnPlayerChangedTeam: CodeBlockEvent<[player: Player, teamName: string, teamGroupName: string]>;
+    OnPlayerFocusUI: CodeBlockEvent<[player: Player, focusedOn: Entity]>;
+    OnPlayerUnfocusUI: CodeBlockEvent<[player: Player, unfocusedFrom: Entity]>;
 };
 /**
  * Content of the data sent when a player purchases an item from an in-world shop

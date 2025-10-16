@@ -568,9 +568,10 @@ export interface INavMeshAgent {
      * The destination of the agent.
      *
      * @remarks
-     * In Play Mode, agents move towards their destination until reached. If the position is outside
-     * the navigable surface then it sets the closest navigable point as the destination. Overrides any
-     * existing destination set.
+     * In Play Mode, agents move towards their destination until reached. When the position is outside
+     * the navigable surface, the agent will not be able to find path to the destination.
+     * If it is the intention to move towards a position outside the navigable surface, use the
+     * {@link getNearestPoint} method to get a valid target location.
      */
     destination: HorizonProperty<Vec3 | null>;
     /**
@@ -864,9 +865,10 @@ export declare class NavMeshAgent extends Entity implements INavMeshAgent {
      * The destination of the agent.
      *
      * @remarks
-     * In Play Mode, agents move towards their destination until reached. If the position is outside
-     * the navigable surface then it sets the closest navigable point as the destination. Overrides any
-     * existing destination set.
+     * In Play Mode, agents move towards their destination until reached. When the position is outside
+     * the navigable surface, the agent will not be able to find path to the destination.
+     * If it is the intention to move towards a position outside the navigable surface, use the
+     * {@link getNearestPoint} method to get a valid target location.
      */
     destination: HorizonProperty<Vec3 | null>;
     /**

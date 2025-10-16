@@ -85,9 +85,12 @@ declare module "horizon/core" {
   interface Quaternion {
     angleTo(b: hz.Quaternion): number;
     rotateVec3(v: hz.Vec3): hz.Vec3;
-    forward: hz.Vec3;
-    right: hz.Vec3;
-    up: hz.Vec3;
+    getForward(): hz.Vec3;
+    getRight(): hz.Vec3;
+    getUp(): hz.Vec3;
+    // forward: hz.Vec3;
+    // right: hz.Vec3;
+    // up: hz.Vec3;
   }
 }
 
@@ -114,24 +117,39 @@ hz.Quaternion.prototype.rotateVec3 = function(v: hz.Vec3): hz.Vec3 {
   );
 };
 
-// convenience accessors
-Object.defineProperty(hz.Quaternion.prototype, "forward", {
-  get: function(this: hz.Quaternion) {
-    return this.rotateVec3(hz.Vec3.forward);
-  }
-});
+hz.Quaternion.prototype.getForward = function(): hz.Vec3 {
+  const q = this as hz.Quaternion;
+  return this.rotateVec3(hz.Vec3.forward);
+}
 
-Object.defineProperty(hz.Quaternion.prototype, "right", {
-  get: function(this: hz.Quaternion) {
-    return this.rotateVec3(hz.Vec3.right);
-  }
-});
+hz.Quaternion.prototype.getRight = function(): hz.Vec3 {
+  const q = this as hz.Quaternion;
+  return this.rotateVec3(hz.Vec3.right);
+}
 
-Object.defineProperty(hz.Quaternion.prototype, "up", {
-  get: function(this: hz.Quaternion) {
-    return this.rotateVec3(hz.Vec3.up);
-  }
-});
+hz.Quaternion.prototype.getUp = function(): hz.Vec3 {
+  const q = this as hz.Quaternion;
+  return this.rotateVec3(hz.Vec3.up);
+}
+
+// // convenience accessors
+// Object.defineProperty(hz.Quaternion.prototype, "forward", {
+//   get: function(this: hz.Quaternion) {
+//     return this.rotateVec3(hz.Vec3.forward);
+//   }
+// });
+
+// Object.defineProperty(hz.Quaternion.prototype, "right", {
+//   get: function(this: hz.Quaternion) {
+//     return this.rotateVec3(hz.Vec3.right);
+//   }
+// });
+
+// Object.defineProperty(hz.Quaternion.prototype, "up", {
+//   get: function(this: hz.Quaternion) {
+//     return this.rotateVec3(hz.Vec3.up);
+//   }
+// });
 
 declare module 'horizon/core' {
   interface Color {

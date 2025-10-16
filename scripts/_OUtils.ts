@@ -31,10 +31,11 @@ export class OUtils {
         }
     }
 
-    public static closestPlayer(wrapper: OWrapper, position: hz.Vec3): { player: hz.Player, distance: number } {
-        const playerList = wrapper.world.getPlayers();
+    public static closestPlayer(wrapper: OWrapper, position: hz.Vec3, playerList?: hz.Player[], serverPlayer?: hz.Player): { player: hz.Player, distance: number } {
+        if (!playerList) playerList = wrapper.world.getPlayers(); // Expensive
+        if (!serverPlayer) serverPlayer = wrapper.world.getServerPlayer();
         let minDistance = Number.MAX_VALUE;
-        let closePlayer: hz.Player = wrapper.world.getServerPlayer();
+        let closePlayer: hz.Player = serverPlayer;
         for (const player of playerList) {
             const playerPosition = player.position.get();
             const distance = playerPosition.distance(position);
@@ -45,4 +46,28 @@ export class OUtils {
         }
         return { player: closePlayer, distance: minDistance };
     }
+
+    public static getChildWithTag(entity: hz.Entity, tag: string): hz.Entity | null {
+		for (const child of entity.children.get()) {
+			if (child.tags.contains(tag)) {
+				return child;
+			}
+			else if (child.children.get().length != 0) {
+				const match = this.getChildWithTag(child, tag);
+				if (match != null) { return match; }
+			}
+		}
+		return null;
+	}
+	
+	public static getChildrenWithTag(entity: hz.Entity, list: hz.Entity[], tag: string) {
+		for (const child of entity.children.get()) {
+			if (child.tags.contains(tag)) {
+				list.push(child)
+			}
+			else if (child.children.get().length != 0) {
+				this.getChildrenWithTag(child, list, tag);
+			}
+		}
+	}
 }

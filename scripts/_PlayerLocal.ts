@@ -4,8 +4,6 @@ import { OMobileController } from '_OMobileController';
 import { PlayerRescueModule } from 'PlayerRescueModule';
 
 export class PlayerLocal extends hz.Component {
-  public static onTouch = new hz.NetworkEvent<{ hit: hz.EntityRaycastHit; player: hz.Player }>("onTouch");
-
   private mobile!: OMobileController;
   private rescue?: PlayerRescueModule;
 

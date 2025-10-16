@@ -6,10 +6,12 @@ import { OEntityManager } from "_OEntityManager";
 import { OClouds } from "_OClouds";
 import { OTerrain } from "_OTerrain";
 import { OEvent } from "_OEvent";
-import { PlayerLocal } from "_PlayerLocal";
 import { TreeBase } from "_TreeBase";
 import { OFluid } from "_OFluid";
 import { OInventoryManager } from "_OInventory";
+import { PlayerEvent } from "_PlayerEvent";
+import { OTriggerPool } from "_OTriggerPool";
+import { OInteractableManager } from "_OInteractableManager";
 
 export class OisifManager {
     // public static I: OisifManager; // TODO : Should be removed
@@ -19,6 +21,8 @@ export class OisifManager {
     public manager!: OEntityManager;
     public random!: ORandom;
 
+    public interactable!: OInteractableManager;
+    public trigger!: OTriggerPool;
     public inventory!: OInventoryManager;
 
     private cloud!: OClouds;
@@ -33,11 +37,13 @@ export class OisifManager {
         this.wrapper = new OWrapper(component);
         this.pool = new OPoolManager(this.wrapper);
         this.manager = new OEntityManager(this.wrapper, this.pool);
+        this.interactable = new OInteractableManager(this.wrapper);
+        this.trigger = new OTriggerPool(this.wrapper, this.interactable);
         this.inventory = new OInventoryManager(this.wrapper, this.manager);
 
         this.cloud = new OClouds(this.wrapper, this.pool, this.random);
-        this.terrain = new OTerrain(this.wrapper, this.manager, this.inventory, this.random, 40, 4);
-        // this.wrapper.component.connectNetworkBroadcastEvent(UpdateUIBar, (payload) => {
+        this.terrain = new OTerrain(this.wrapper, this.manager, this.inventory, this.interactable, this.random, 40, 4);
+        // this.wrapper.component.connectNetworkBroadcastEvent(OuiProgressEvent, (payload) => {
         //     if (payload.id == 'Discovered' && payload.percent == 1 && !this.fuild) {
         //         this.fuild = new OFluid(this.wrapper, this.manager, new hz.Vec3(0, 10, 0));
         //         OEntity.melody!.useScale("mixolydian")
@@ -49,11 +55,11 @@ export class OisifManager {
 
         this.wrapper.component.connectNetworkBroadcastEvent(OEvent.onTerrainSpawn, (payload) => {
             if (this.random.bool(0.4)) {
-                const tree = new TreeBase(this.wrapper, this.manager, payload.entity.position.get());
+                const tree = new TreeBase(this.wrapper, this.manager, this.interactable, payload.entity.position.get());
                 this.treeList.push(tree);
             }
         });
-        this.wrapper.component.connectNetworkBroadcastEvent(PlayerLocal.onTouch, (payload) => {
+        this.wrapper.component.connectNetworkBroadcastEvent(PlayerEvent.onTouch, (payload) => {
             this.onTouch(payload.hit, payload.player);
         });
     }

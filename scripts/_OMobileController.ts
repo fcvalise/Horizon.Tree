@@ -3,9 +3,9 @@ import { Gestures } from "horizon/mobile_gestures";
 import LocalCamera, { CameraMode, Easing } from "horizon/camera";
 import "./_OMath"
 import { OWrapper } from "_OWrapper";
-import { PlayerLocal } from "_PlayerLocal";
 import { OFocus } from "_OFocus";
 import { OCursor } from "_OCursor";
+import { PlayerEvent } from "_PlayerEvent";
 
 class CameraAim {
     private rotation = hz.Quaternion.zero;
@@ -107,7 +107,7 @@ export class OMobileController {
             const raycast = this.wrapper.entity.children.get()[0].as(hz.RaycastGizmo);
             this.focus.castFromInteractions([info], raycast, (hit) => {
                 if (this.cursor.getSelected() == hit.target) {
-                    this.wrapper.component.sendNetworkBroadcastEvent(PlayerLocal.onTouch, { hit, player: this.player });
+                    this.wrapper.component.sendNetworkBroadcastEvent(PlayerEvent.onTouch, { hit, player: this.player });
                     this.cursor.clearSelected();
                 } else {
                     this.cursor.select(hit.target);

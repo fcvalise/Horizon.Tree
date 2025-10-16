@@ -112,7 +112,7 @@ export class OEntity {
       this.isReady = false;
       const id = Library.colorMap.get(this.oColor)!;
       const asset = new hz.Asset(BigInt(id));
-      const position = this.oPosition.add(this.oRotation.forward.mul(0))
+      const position = this.oPosition.add(this.oRotation.getForward().mul(0))
       const timestamp = this.timestamp = Date.now();
       this.wrapper.world.spawnAsset(asset, position, this.oRotation, this.oScale.mul(1))
       .then((promise) => {
@@ -123,29 +123,8 @@ export class OEntity {
         if (timestamp < this.timestamp) {// something happen in between
           this.deleteStatic();
         } else {
-          const colorCache = this.color.clone();
-          const scaleCache = this.scale.clone();
           this.entity?.collidable.set(false);
           this.deleteDynamic();
-
-          // this.tweenTo({
-          //   duration: 0.3,
-          //   color: this.color.mul(0.8),
-          //   scale: this.scale.mul(1.1),
-          //   ease: Ease.quadInOut,
-          //   makeStatic: false,
-          // }).then(() => {
-          //   this.playMelody();
-          //   this.tweenTo({
-          //       duration: 0.2,
-          //       color: colorCache,
-          //       scale: scaleCache,
-          //       ease: Ease.quadInOut,
-          //       makeStatic: false,
-          //   }).then(() => {
-              // this.deleteDynamic();
-            // })
-          // })
         }
       });
       return true;
@@ -412,8 +391,8 @@ OEntity.prototype.tweenTo = function (args: TweenArgs): Promise<void> {
         // Snap to exact end values at completion.
         if (args.position || args.positionGetter) this.position = currentTargetPosition.clone();
         if (args.rotation || args.rotationGetter) this.rotation = currentTargetRotation.clone();
-        if (args.scale || args.scaleGetter) this.scale = staticEndScale.clone();
-        if (args.color) this.color = staticEndColor.clone();
+        if (args.scale || args.scaleGetter) this.scale = staticEndScale.clone();        
+        if (args.color) this.color = args.color;
         if (makeStatic) this.makeStatic();
 
         unsubscribe(subscription);

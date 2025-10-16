@@ -43,6 +43,21 @@ export class OWrapper {
         return () => { try { sub.disconnect?.(); } catch {} };
     }
 
+    public onPlayerExit(cb: (player: hz.Player) => void) : () => void {
+        const sub = this.component.connectCodeBlockEvent(this.component.entity, hz.CodeBlockEvents.OnPlayerExitWorld,
+            (player: hz.Player) => { cb(player); });
+        this.subscriptions.push(sub);
+        return () => { try { sub.disconnect?.(); } catch {} };
+    }
+
+    public setTimeout(cb: () => void, time: number): number {
+        return this.component.async.setTimeout(cb, time * 1000);
+    }
+
+    public setInterval(cb: () => void, time: number): number {
+        return this.component.async.setInterval(cb, time * 1000);
+    }
+
     public waitFrames(frames: number = 1): Promise<void> {
         return new Promise(res => {
             let left = frames;

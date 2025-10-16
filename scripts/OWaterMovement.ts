@@ -1,14 +1,9 @@
-import { OisifManager } from '_OManager';
-import { ORandom } from '_ORandom';
 import { OWrapper } from '_OWrapper';
 import * as hz from 'horizon/core';
 
 type Wave = { ampDeg: number; freq: number; phase: number; dirDeg: number; };
-const DEG = (r:number)=> r*180/Math.PI;
 
-class WaterMovement extends hz.Component<typeof WaterMovement> {
-  private wrapper!: OWrapper;
-  private random!: ORandom;
+class OWaterMovement extends hz.Component<typeof OWaterMovement> {
   private t = 0;
   private originPos!: hz.Vec3;
   private baseRot!: hz.Quaternion;
@@ -24,18 +19,19 @@ class WaterMovement extends hz.Component<typeof WaterMovement> {
   private bobAmp = 0.05;   // 5 cm
   private bobFreq = 0.07;  // Hz-ish
   private bobPhase = 0.4;
-  private randomize = 0;
 
   start() {
-    this.wrapper = new OWrapper(this);
-    this.random = new ORandom('Oisif');
-    this.wrapper.onUpdate((dt) => this.update(dt));
+    const wrapper = new OWrapper(this);
+    wrapper.onPlayerEnter((player) => {
+      this.entity.owner.set(player);
+    })
+    this.connectLocalBroadcastEvent(hz.World.onUpdate,(payload) => { this.update(payload.deltaTime); });
 
     this.originPos = this.entity.position.get();
     // Plane horizontal in your setup (X=270°). Keep current yaw so coastline alignment stays stable.
     const current = this.entity.rotation.get();
     this.baseRot = current ?? hz.Quaternion.fromEuler(new hz.Vec3(0, 0, 0));
-    this.t = this.random.range(0, 10)
+    this.t = Math.random() * 10;
   }
 
   private update(dt: number) {
@@ -62,4 +58,4 @@ class WaterMovement extends hz.Component<typeof WaterMovement> {
     this.entity.position.set(new hz.Vec3(this.originPos.x, y, this.originPos.z));
   }
 }
-hz.Component.register(WaterMovement);
+hz.Component.register(OWaterMovement);
