@@ -5,12 +5,10 @@ import { OWrapper } from "_OWrapper";
 export class Interactable {
     constructor(
         public oEntity: OEntity,
-        public interact: (player: hz.Player) => void
+        public price: number,
+        public infos: string,
+        public interact: (player: hz.Player) => void,
     ) { }
-
-    static create(oEntity: OEntity, interact: (player: hz.Player) => void) {
-        return new Interactable(oEntity, interact);
-    }
 }
 
 export class OInteractableManager {
@@ -18,8 +16,8 @@ export class OInteractableManager {
 
     constructor(private wrapper: OWrapper) { }
 
-    add(oEntity: OEntity, interact: (player: hz.Player) => void): () => void {
-        const item = Interactable.create(oEntity, interact!);
+    add(oEntity: OEntity, price: number, infos: string, interact: (player: hz.Player) => void): () => void {
+        const item = new Interactable(oEntity, price, infos, interact!);
         this.items.add(item);
         return () => this.items.delete(item);
     }

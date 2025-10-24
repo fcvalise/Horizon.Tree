@@ -12,6 +12,10 @@ export class OuiHelper {
     return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a})`;
   }
 
+  public static convertOffsetToScreenSpace(offset: hz.Vec3): { x: string; y: string } {
+    return { x: `${offset.x}%`, y: `${100 - offset.y}%` };
+  }
+
   /**
    * Build a framed container style: transparent gap (padding) + visible border + rounded inner.
    * Set `snapEvenBorder` to true to avoid thin inner seams on odd border widths.

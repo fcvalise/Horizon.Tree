@@ -61,7 +61,7 @@ export class OEntity {
       this.isSleeping = false;
       this.isFalling = false;
       this.updatePhysics();
-      this.enableTrail(true)
+      // this.enableTrail(true);
       this.timestamp = Date.now();
       return true;
     }

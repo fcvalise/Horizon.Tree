@@ -50,8 +50,6 @@ export class TreeGrowth {
     private budRoot!: Bud;
     private isStopped: boolean = false;
 
-    public static count = 0;
-
     constructor(
         private position: hz.Vec3,
         private wrapper: OWrapper,
@@ -73,7 +71,7 @@ export class TreeGrowth {
         });
     }
 
-    public createRoot() {
+    private createRoot() {
         this.growthQueue = [];
         for (let i = 0; i < this.settings.initialCount; i++) {
             const baseUp = hz.Vec3.up;
@@ -176,10 +174,9 @@ export class TreeGrowth {
                         scale: new hz.Vec3(0.5, 0.5, 0.1),
                         color: OColor.Orange,
                         makeStatic: false
-                    })//.then(() => {
-                        oEntityFall.makePhysic();
-                        oEntityFall.isCollectible = true;
-                    // })
+                    })
+                    oEntityFall.makePhysic();
+                    oEntityFall.isCollectible = true;
 
                     // Create new leaf
                     // const oEntityNew = this.manager.create();
@@ -265,11 +262,11 @@ export class TreeGrowth {
                 });
 
                 if (bud === this.budRoot) {
-                    const dispose = this.interactable.add(this.budRoot.oEntity!, (player) => {
-                        // this.prune(this.budRoot.oEntity?.entity ?? this.budRoot.oEntity?.staticProxy!);
-                        this.harvest(this.budRoot);
-                        // this.wrapper.component.async.setInterval(() => dispose(), 10);
-                    });
+                    // const dispose = this.interactable.add(this.budRoot.oEntity!, (player) => {
+                    //     // this.prune(this.budRoot.oEntity?.entity ?? this.budRoot.oEntity?.staticProxy!);
+                    //     this.harvest(this.budRoot);
+                    //     // this.wrapper.component.async.setInterval(() => dispose(), 10);
+                    // });
                 }
             }
         } else {

@@ -22,9 +22,7 @@ class OWaterMovement extends hz.Component<typeof OWaterMovement> {
 
   start() {
     const wrapper = new OWrapper(this);
-    wrapper.onPlayerEnter((player) => {
-      this.entity.owner.set(player);
-    })
+    wrapper.onPlayerEnter((player) => { this.entity.owner.set(player); })
     this.connectLocalBroadcastEvent(hz.World.onUpdate,(payload) => { this.update(payload.deltaTime); });
 
     this.originPos = this.entity.position.get();

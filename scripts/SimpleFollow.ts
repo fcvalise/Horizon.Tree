@@ -1,25 +1,34 @@
+import { ORandom } from "_ORandom";
 import { OWrapper } from "_OWrapper";
 import * as hz from "horizon/core";
 
 export class SimpleFollow extends hz.Component<typeof SimpleFollow> {
   target!: hz.Player;
+  random!: ORandom;
   
-  tickMs = 33;
   posLerp = 0.15;
   rotLerp = 0.9;
+  t = 0;
   
   start(): void {
+    this.random = new ORandom('Oisif');
     const wrapper = new OWrapper(this);
     wrapper.onPlayerEnter((player) => {
       this.target = player;
     })
-    this.async.setInterval(() => this.tick(), this.tickMs);
+    wrapper.onUpdate((dt) => this.tick(dt));
   }
 
-  private tick() {
+  private tick(dt: number) {
+    this.t += dt * 0.4;
     if (!this.target) return;
     const position = this.entity.position.get();
-    const targetPosition = this.target.position.get().add(hz.Vec3.one.mul(2));
+    const perlin = new hz.Vec3(
+      this.random.perlin.noise2(this.t, 0) * 8 - 4,
+      2,
+      this.random.perlin.noise2(-this.t, 0) * 8 - 4,
+    );
+    const targetPosition = this.target.position.get().add(perlin);
     const newPosition = hz.Vec3.lerp(position, targetPosition, this.posLerp);
     this.entity.position.set(newPosition);
 

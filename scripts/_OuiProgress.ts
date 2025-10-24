@@ -13,11 +13,11 @@ class OuiProgress extends UIComponent<typeof OuiProgress> {
 
   static propsDefinition = {
     enabled: { type: hz.PropTypes.Boolean, default: true },
-    alpha: { type: hz.PropTypes.Number, default: 0.8 },
-    fillColor: { type: hz.PropTypes.Color },
-    barColor: { type: hz.PropTypes.Color },
+    alpha: { type: hz.PropTypes.Number, default: 0.9 },
+    fillColor: { type: hz.PropTypes.Color, default: new hz.Color(0.98, 0.98, 0.98)},
+    barColor: { type: hz.PropTypes.Color, default: new hz.Color(0.98, 0.98, 0.98)},
     showValue: { type: hz.PropTypes.Boolean, default: true },
-    valueColor: { type: hz.PropTypes.Color },
+    valueColor: { type: hz.PropTypes.Color, default: new hz.Color(0.98, 0.98, 0.98)},
     screenOffset: { type: hz.PropTypes.Vec3, default: new hz.Vec3(50, 90, 0) },
     rotation: { type: hz.PropTypes.Number, default: 0 },
     scale: { type: hz.PropTypes.Number, default: 1.0 },
@@ -86,7 +86,7 @@ class OuiProgress extends UIComponent<typeof OuiProgress> {
         }),
       ],
       style: {
-        width: "40%",
+        width: "20%",
         height: 40,
         layoutOrigin: [0.5, 0.5],
         left: `${this.props.screenOffset.x}%`,

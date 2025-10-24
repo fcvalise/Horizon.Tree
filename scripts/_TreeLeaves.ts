@@ -24,14 +24,16 @@ export class TreeLeaves {
                 const radial = side.rotateArround(phiDeg, forward);
                 const rightX = hz.Vec3.cross(forward, radial).normalize();
                 const upY = hz.Vec3.cross(radial, rightX).normalize();
-                oEntity.position = nodeOrigin.add(radial.mul(this.settings.petioleLength));
-                oEntity.rotation = hz.Quaternion.lookRotation(radial, upY);
+                const scaleValue = this.settings.scale - this.settings.scale * 0.9 * bud.depth / this.treeSettings.maxDepth ;
+                const scale = new hz.Vec3(scaleValue * 0.5, scaleValue, scaleValue * 0.1);
+                oEntity.position = nodeOrigin.add(radial.mul(this.settings.petioleLength + scaleValue * 0.5));
+                oEntity.rotation = hz.Quaternion.lookRotation(upY.add(hz.Vec3.up), radial);
                 oEntity.scale = hz.Vec3.zero;
                 oEntity.color = OColor.LightGreen;
                 oEntity.setTags(['Leaf'])
                 await oEntity.tweenTo({
                     duration: this.random.range(0.8, 1.2),
-                    scale: hz.Vec3.one.mul(this.settings.scale - this.random.next()),
+                    scale: scale,
                     makeStatic: true,
                     ease: Ease.cubicOut
                 });

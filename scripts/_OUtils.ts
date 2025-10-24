@@ -70,4 +70,14 @@ export class OUtils {
 			}
 		}
 	}
+
+    public static setOwnership(entity: hz.Entity, owner: hz.Player, reccursive: boolean = true, ignoreTags: string[] = []) {
+        entity.owner.set(owner);
+        const children = entity.children.get();
+        for (const child of children) {
+            if (!ignoreTags.some(tag => child.tags.contains(tag))) {
+                this.setOwnership(child, owner);
+            }
+        }
+    }
 }

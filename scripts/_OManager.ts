@@ -42,7 +42,10 @@ export class OisifManager {
         this.inventory = new OInventoryManager(this.wrapper, this.manager);
 
         this.cloud = new OClouds(this.wrapper, this.pool, this.random);
-        this.terrain = new OTerrain(this.wrapper, this.manager, this.inventory, this.interactable, this.random, 40, 4);
+        this.terrain = new OTerrain(this.wrapper, this.manager, this.inventory, this.interactable, this.random, 40, 5);
+        
+        // this.fuild = new OFluid(this.wrapper, this.manager, new hz.Vec3(0, 10, 0));
+
         // this.wrapper.component.connectNetworkBroadcastEvent(OuiProgressEvent, (payload) => {
         //     if (payload.id == 'Discovered' && payload.percent == 1 && !this.fuild) {
         //         this.fuild = new OFluid(this.wrapper, this.manager, new hz.Vec3(0, 10, 0));
@@ -54,10 +57,27 @@ export class OisifManager {
         // })
 
         this.wrapper.component.connectNetworkBroadcastEvent(OEvent.onTerrainSpawn, (payload) => {
-            if (this.random.bool(0.4)) {
-                const tree = new TreeBase(this.wrapper, this.manager, this.interactable, payload.entity.position.get());
-                this.treeList.push(tree);
-            }
+            const oEntity = this.manager.get(payload.entity);
+            if (!oEntity) return;
+            const terrainPosition = payload.entity.position.get();
+            const terrainScale = payload.entity.scale.get();
+            const treePosition = new hz.Vec3(
+                terrainPosition.x + this.random.range(-terrainScale.x * 0.25, terrainScale.x * 0.25),
+                terrainPosition.y,
+                terrainPosition.z + this.random.range(-terrainScale.y * 0.25, terrainScale.y * 0.25) 
+            )
+            if (hz.Vec3.zero.distance(treePosition) < 7) return;
+            const tree = new TreeBase(this.wrapper, this.manager, this.interactable, treePosition);
+            this.treeList.push(tree);
+            
+            const rootOEntity = tree.getUnlockableOEntity();
+            const dispose = this.interactable.add(rootOEntity, 2, 'Grow Tree', (player) => {
+                if (this.inventory.get(player)?.has(1)) {
+                    tree.startGrowth();
+                    this.inventory.get(player)?.consume(1, rootOEntity);
+                    this.wrapper.component.async.setTimeout(() => dispose(), 0);
+                }
+            });
         });
         this.wrapper.component.connectNetworkBroadcastEvent(PlayerEvent.onTouch, (payload) => {
             this.onTouch(payload.hit, payload.player);

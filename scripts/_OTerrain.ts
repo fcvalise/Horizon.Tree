@@ -17,6 +17,7 @@ class Cell {
     public created: boolean = false;
     public unlocked: boolean = false;
     public discovered: boolean = false;
+    public init: boolean = false;
 
     // neighbors
     public neighbors4: Cell[] = [];
@@ -33,6 +34,7 @@ class Cell {
 }
 
 export class OTerrain {
+    private readonly initCount = 9;
     private readonly discoverRange = 10;
     private readonly maxDistance = 25;
     private cellArray: Cell[] = [];
@@ -60,80 +62,102 @@ export class OTerrain {
         const playerList = this.wrapper.world.getPlayers();
         const serverPlayer = this.wrapper.world.getServerPlayer();
         for (const cell of this.cellArray) {
-            const result = OUtils.closestPlayer(this.wrapper, cell.position, playerList, serverPlayer);
-            const inRange = result.distance < this.discoverRange;
+            this.createCell(cell, playerList, serverPlayer);
+            this.unlockCell(cell);
+        }
+    }
 
-            if (!cell.created && inRange) {
-                cell.oEntity = this.manager.create()
-                cell.oEntity.position = cell.position.add(this.random.vector());
-                cell.oEntity.rotation = cell.rotation;
-                cell.oEntity.color = OColor.Grey;
-                cell.oEntity.setTags(['Terrain']);
-                if (cell.oEntity.makeDynamic()) {
-                    cell.oEntity.playMelody();
-                    cell.created = true;
-                    cell.oEntity.scaleZeroTo(cell.scale.mul(0.5), 0.8, false);
-                    
-                    const dispose = this.interactable.add(cell.oEntity, (player) => {
-                        const inventory = this.inventory.get(player);
-                        if (!cell.unlocked && inventory?.has(1)) {
-                            cell.unlocked = true;
-                            if (cell.oEntity) {
-                                inventory.consume(1, cell.oEntity!);
-                                cell.oEntity.rotation = cell.rotation;
-                                cell.oEntity.scale = cell.scale.mul(0.5);
-                                cell.oEntity.color = OColor.Grey;
-                                cell.oEntity.setTags(['Terrain']);
-                                if (cell.oEntity.makeDynamic()) {
-                                    cell.oEntity.playMelody();
-                                    cell.oEntity.tweenTo({
-                                        duration: 0.4,
-                                        position: cell.position,
-                                        scale: cell.scale,
-                                        color: OColor.DarkGreen,
-                                        ease: Ease.quadInOut,
-                                        delay: 1.3,
-                                        makeStatic: true
-                                    })
-                                    .then(() => {
-                                        cell.discovered = true;
-                                        this.wrapper.component.sendNetworkBroadcastEvent(OEvent.onTerrainSpawn,
-                                            { entity: cell.oEntity?.entity! });
-                                    });
-                                    this.interactable.delete(cell.oEntity);
-                                }
-                            }
-                            this.wrapper.component.async.setTimeout(() => dispose(), 10);
-                        }
-                    });
-                } else {
-                    this.manager.delete(cell.oEntity);
-                }
+    private createCell(cell: Cell, playerList: hz.Player[], serverPlayer: hz.Player) {
+        if (cell.created) return;
+        const result = OUtils.closestPlayer(this.wrapper, cell.position, playerList, serverPlayer);
+        const create = cell.init || result.distance < this.discoverRange;
+        if (cell.neighbors8.filter((c) => (c.discovered || c.init) && !c.oEntity?.isTweening()).length == 0) return;
+        if (!create) return;
+        cell.created = true;
+        cell.oEntity = this.manager.create()
+        cell.oEntity.position = cell.position.add(this.random.vector());
+        cell.oEntity.rotation = cell.rotation;
+        cell.oEntity.color = OColor.White;
+        cell.oEntity.setTags(['Terrain', 'Walkable']);
+        if (cell.oEntity.makeDynamic()) {
+            cell.oEntity.playMelody();
+            cell.oEntity.scaleZeroTo(cell.scale.mul(0.5), 0.8, false);
+            if (cell.init) {
+                cell.unlocked = true;
+            } else {
+                this.registerUnlock(cell);
             }
+        } else {
+            cell.created = false;
+            this.manager.delete(cell.oEntity);
+        }
+    }
+
+    private registerUnlock(cell: Cell) {
+        const dispose = this.interactable.add(cell.oEntity!, 1, 'Expand', (player) => {
+            if (!cell.oEntity) return;
+            if (cell.unlocked) return;
+            if (!this.inventory.get(player)?.has(1)) return;
+
+            this.inventory.get(player)?.consume(1, cell.oEntity!);
+            cell.unlocked = true;
+            this.wrapper.component.async.setTimeout(() => dispose(), 10);
+        });
+    }
+
+    private unlockCell(cell: Cell) {
+        if (!cell?.oEntity) return;
+        if (!cell.created || !cell.unlocked || cell.discovered) return;
+        
+        cell.discovered = true;
+        cell.oEntity.rotation = cell.rotation;
+        cell.oEntity.scale = cell.scale.mul(0.5);
+        cell.oEntity.color = OColor.White;
+        if (cell.oEntity.makeDynamic()) {
+            cell.oEntity.playMelody();
+            cell.oEntity.tweenTo({
+                duration: 0.4,
+                position: cell.position,
+                scale: cell.scale,
+                color: OColor.DarkGreen,
+                ease: Ease.quadInOut,
+                delay: 1.3,
+                makeStatic: true
+            })
+            .then(() => {
+                this.wrapper.component.sendNetworkBroadcastEvent(OEvent.onTerrainSpawn,
+                    { entity: cell.oEntity?.entity! });
+            });
+            // this.interactable.delete(cell.oEntity);
+        } else {
+            cell.discovered = false;
         }
     }
 
     private async create() {
-        const half = -this.gridSize * this.cellSize * 0.5;
+        const half = -this.gridSize * this.cellSize * 0.5 - this.cellSize * 0.5;
         const startPos = new hz.Vec3(half, 0, half);
         const perlin = this.random.perlin;
         OUtils.spiralGrid(this.gridSize, this.gridSize, (x, z, i) => {
             let noise = perlin.ridged2(x * 0.2, z * 0.2);
             // position
             const posX = x * this.cellSize + this.cellSize * 0.5;
-            const posY = this.easeInExpo(noise) * 2;
+            const posY = this.easeInExpo(noise) * 4;
             const posZ = z * this.cellSize + this.cellSize * 0.5;
-            const position = new hz.Vec3(posX, posY, posZ).add(startPos);
+            let position = new hz.Vec3(posX, posY, posZ).add(startPos);
+            position = position.add(position.mul(0.2));
+
             // rotation
             const lookAtDir = hz.Vec3.down.mul(10).add(this.random.vectorHalf());
             const twist = lookAtDir.rotateArround(this.random.range(0, 360), lookAtDir);
             let rotation = hz.Quaternion.lookRotation(twist);
             // scale
             const scaleXZRandom = this.random.next() * 0.5;
-            const scaleX = 6 * (1.5 - noise + scaleXZRandom);
-            const scaleY = 6 * (1.5 - noise + scaleXZRandom);
+            const scaleX = 8 * (1.5 - noise + scaleXZRandom);
+            const scaleY = 8 * (1.5 - noise + scaleXZRandom);
             const scaleZ = 100;
             let scale = new hz.Vec3(scaleX, scaleY, scaleZ);
+            scale = scale.add(hz.Vec3.one.mul(i / 20));
             // color
             const r = 0.8 * this.random.range(0.98, 1.02) * noise;
             const g = 0.94 * this.random.range(0.98, 1.02) * noise;
@@ -143,8 +167,9 @@ export class OTerrain {
 
             const distance = hz.Vec3.zero.distance(position) / this.maxDistance;
             noise -= distance * distance * 0.5;
-            if (noise > 0.2) {
+            if (noise > 0.2 && i != 0) {
                 const cell = new Cell(x, z, position, rotation, scale, color);
+                cell.init = i < this.initCount;
                 this.cellArray.push(cell);
                 this.cellByGrid.set(this.key(x, z), cell);
             }
@@ -186,7 +211,10 @@ export class OTerrain {
         for (let x = 0; x < this.gridSize; x++) {
             for (let z = 0; z < this.gridSize; z++) {
                 const cell = this.cellByGrid.get(this.key(x, z));
-                str += !cell ? ' ' : cell.discovered ? '•' : '·';
+                if (!cell) str += ' ';
+                else if (!cell.created) str += ' ';
+                else if (!cell.discovered) str += '·';
+                else str += '•';
             }
             str += '.\n';
         }

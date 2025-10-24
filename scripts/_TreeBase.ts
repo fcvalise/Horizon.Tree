@@ -7,6 +7,9 @@ import { ORaycast } from "_ORaycast";
 import { OEntityManager } from "_OEntityManager";
 import { ORandom } from "_ORandom";
 import { OInteractableManager } from "_OInteractableManager";
+import { Ease, OEntity } from "_OEntity";
+import { OColor } from "_OColor";
+import { OUtils } from "_OUtils";
 
 const DefaultSettings: TreeSettings = {
     seed: 'MyTree',
@@ -35,11 +38,11 @@ const DefaultSettings: TreeSettings = {
         leafAssetId: Library.matter,
     },
     leaf: {
-        minBranch: 0.4,
-        scale: 1.6,
-        count: 2,
-        petioleLength: 0.1,
-        axialJitter: 0.08,
+        minBranch: 0.2,
+        scale: 6,
+        count: 4,
+        petioleLength: 0,
+        axialJitter: 0.2,
         spiralDivergence: 137.5,
         whorlCount: 3,
         branchPhyllotaxy: "Spiral",
@@ -60,8 +63,10 @@ export function cloneSettings(settings: TreeSettings): TreeSettings {
 }
 
 export class TreeBase {
-    public settings: TreeSettings = DefaultSettings;
-    public isGrowing: boolean = true;
+    private settings: TreeSettings = DefaultSettings;
+
+    private isGrowing: boolean = false;
+    private unlockable!: OEntity;
     private growth!: TreeGrowth;
 
     constructor(
@@ -74,17 +79,56 @@ export class TreeBase {
         const random = new ORandom(position.x * position.z * position.y);
         // this.settings = mergeSettings(DefaultSettings, this.getRandomSettings(position));
         this.settings = cloneSettings(DefaultSettings);
-        this.settings.branch.length = random.range(1, 4);
+        this.settings.branch.length = random.range(2, 4);
         this.settings.branch.bottomWidth = random.range(0.4, 0.7);
-        this.settings.leaf.scale = random.range(1.2, 2);
-        this.addShadow(position);
+        this.settings.leaf.scale = random.range(2, 4);
+
+        this.createUnlockable(position);
+
         this.growth = new TreeGrowth(position, wrapper, manager, this.interactable, this.settings);
-        this.wrapper.onUpdateUntil(() => this.growth.step(), () => !this.isGrowing);
+        // this.wrapper.onUpdate(() => {
+        //     if (this.isGrowing) this.growth.step()
+        // });
 
         // this.component.connectNetworkBroadcastEvent(TreeEvent.spawnTreeDescription, (payload) => {
         //     this.createTreeDescription(payload.position);
         // });
         // this.createTreeDescription(position.add(hz.Vec3.up.add(hz.Vec3.forward)));
+    }
+
+    public async startGrowth() {
+        if (!this.isGrowing) {
+            await OUtils.waitFor(this.wrapper, () => this.unlockable.makeDynamic());
+            this.addShadow(this.position);
+            await this.unlockable.tweenTo({
+                duration: 1.4,
+                position: this.position,
+                scale: hz.Vec3.zero,
+                ease: Ease.quadInOut,
+            });
+            this.isGrowing = true;
+            this.unlockable.makeInvisible();
+            this.wrapper.onUpdateUntil(() => this.growth.step(), () => !this.isGrowing);
+        }
+    }
+
+    private async createUnlockable(position: hz.Vec3) {
+        const oEntity = this.manager.create();
+        oEntity.position = position;
+        oEntity.rotation = hz.Quaternion.lookRotation(hz.Vec3.down);
+        oEntity.scale = hz.Vec3.zero;
+        oEntity.color = OColor.Black;
+        this.unlockable = oEntity;
+
+        await OUtils.waitFor(this.wrapper, () => oEntity.makeDynamic());
+            // oEntity.playMelody();
+        await oEntity.tweenTo({
+            duration: 0.4,
+            position: position.add(hz.Vec3.up),
+            scale: new hz.Vec3(0.3, 0.3, 1),
+            ease: Ease.quadInOut,
+            makeStatic: true
+        });
     }
 
     private addShadow(position: hz.Vec3) {
@@ -101,6 +145,10 @@ export class TreeBase {
             this.wrapper.world.spawnAsset(asset, position, rotation, scale)
             .then((promise) => { });
         }
+    }
+
+    public getUnlockableOEntity(): OEntity {
+        return this.unlockable!;
     }
 
     // createTreeDescription(position: hz.Vec3) {
