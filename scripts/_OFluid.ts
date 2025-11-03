@@ -19,27 +19,36 @@ export class OFluid {
   private index = 0;
 
   // tuning
-  private baseScale = 0.1;
+  private baseScale = 0.2;
   private orientSpeed = 50;
   private splashTime = 0.12;
-  private splashXY = 6;
+  private splashXY = 12;
   private splashZMin = 0.03;
 
   // falling stretch targets (for non-splash frames)
   private fallMinXY = 0.2;   // how thin XY gets at max fall
-  private fallMaxZ = 10.0;    // how tall Z gets at max fall
-  private maxVertSpeed = 10;  // |vy| that maps to full stretch
-  private readonly eps = 1; // small deadzone to avoid jittering impacts at rest
+  private fallMaxZ = 10.0;   // how tall Z gets at max fall
+  private maxVertSpeed = 10; // |vy| that maps to full stretch
+  private readonly eps = 1;  // small deadzone to avoid jittering impacts at rest
 
+  // settle thresholds (for dispose)
+  private readonly settleVertEps = 0.05;   // |vy| ≤ this counts as vertical rest
+  private readonly settleLatEps  = 0.05;   // sqrt(vx^2+vz^2) ≤ this counts as lateral rest
 
   // color palette & weights
   private colRest = new hz.Color(0.20, 0.55, 1.00); // calm blue
   private colFast = new hz.Color(0.35, 0.90, 1.00); // cyan-ish for speed
-  private colImpact = hz.Color.white;                 // flash on impact
+  private colImpact = hz.Color.white;               // flash on impact
   private colStretch = new hz.Color(0.65, 0.45, 1.00); // slight purple when stretched
 
   private colorStretchAmt = 0.35; // how much stretch influences tint
-  private colorImpactAmt = 1.00; // full flash weighting (scaled by impactT/splashTime)
+  private colorImpactAmt = 1.00;  // full flash weighting (scaled by impactT/splashTime)
+
+  // lifecycle
+  private disposing = false;      // set true when dispose() is called
+  private disposed  = false;      // becomes true once everything has settled & frozen
+  private resolveDispose?: () => void;
+  private disposeCallback?: (position: hz.Vec3) => void;
 
   constructor(private wrapper: OWrapper, private manager: OEntityManager, private position: hz.Vec3) {
     this.wrapper.onUpdate((dt) => this.update(dt));
@@ -55,22 +64,51 @@ export class OFluid {
     }
   }
 
+  public playFor(second: number) {
+    this.disposed = false;
+    this.disposing = false;
+    OEntity.melody!.useScale("mixolydian")
+    .useKey("D")
+    .setOctaves(1, 3)
+    .setQuantize(true, { bpm: 300, maxPerTick: 12 });
+    this.wrapper.setInterval(() => {
+      this.dispose(() => {});
+      OEntity.melody!.useScale("dorian")
+      .useKey("D")
+      .setOctaves(0, 2)
+      .setQuantize(true, { bpm: 300, maxPerTick: 12 });
+    }, second);
+  }
+
   private update(dt: number) {
-    this.timer += dt;
-    if (this.timer > this.interval) {
-      this.timer = 0;
-      this.interval = this.random.range(0.01, 0.2);
-      this.index = this.index + 1 >= this.maxCount ? 0 : this.index + 1;
-      
-      const drop = this.dropList[this.index];
-      if (drop.makeDynamic()) {
-        drop.makePhysic();
+    // If we're fully disposed, do nothing.
+    if (this.disposed) return;
+
+    // Spawn logic (disabled when disposing)
+    if (!this.disposing) {
+      this.timer += dt;
+      if (this.timer > this.interval) {
+        this.timer = 0;
+        this.interval = this.random.range(0.01, 0.2);
+        this.index = this.index + 1 >= this.maxCount ? 0 : this.index + 1;
+
+        const drop = this.dropList[this.index];
+        if (drop.makeDynamic()) {
+          drop.makePhysic();
+        }
+        const randomSize = 4;
+        const randomPosition = new hz.Vec3(
+          this.random.next() * randomSize - randomSize * 0.5,
+          0,
+          this.random.next() * randomSize - randomSize * 0.5
+        );
+        drop.position = this.position.add(randomPosition);
+        this.state.set(drop, { falling: false, impactT: 0 });
       }
-      const randomSize = 20;
-      const randomPosition = new hz.Vec3(this.random.next() * randomSize - randomSize * 0.5, 0, this.random.next() * randomSize - randomSize * 0.5)
-      drop.position = this.position.add(randomPosition);
-      this.state.set(drop, { falling: false, impactT: 0 });
     }
+
+    // Track whether all drops have fully settled (used for dispose)
+    let allSettled = true;
 
     for (const drop of this.dropList) {
       const physics = drop.entity?.as(hz.PhysicalEntity);
@@ -100,7 +138,10 @@ export class OFluid {
         st.impactT = Math.max(0, st.impactT - dt);
 
         const targetXY = this.baseScale * this.splashXY;
-        const targetZ = Math.max(this.splashZMin, (this.baseScale * this.baseScale * this.baseScale) / (targetXY * targetXY));
+        const targetZ = Math.max(
+          this.splashZMin,
+          (this.baseScale * this.baseScale * this.baseScale) / (targetXY * targetXY)
+        );
 
         drop.scale = new hz.Vec3(
           drop.scale.x * 0.9 + targetXY * 0.1,
@@ -122,12 +163,12 @@ export class OFluid {
 
       st.falling = isFalling;
 
+      // Color dynamics
       const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
       const tSpeed = clamp01(Math.abs(v.y) / this.maxVertSpeed);
       const xyMean = (drop.scale.x + drop.scale.y) * 0.5;
       const stretch = clamp01((drop.scale.z / Math.max(1e-6, xyMean) - 1) / (this.fallMaxZ - 1));
       const posY = drop.entity!.position.get().y;
-      const d = Math.max(0, posY - 0);
       const lateral = Math.hypot(v.x, v.z);
       const slide = clamp01(lateral / 4);
       let c = hz.Color.lerp(this.colRest, this.colFast, tSpeed);
@@ -137,8 +178,40 @@ export class OFluid {
         c = hz.Color.lerp(c, this.colImpact, pulse * this.colorImpactAmt);
       }
       if (slide > 0) c = hz.Color.lerp(c, new hz.Color(0.65, 1.0, 0.75), 0.15 * slide);
-
       drop.color = c;
+
+      // Settle detection (for disposal)
+      // Settled when: no splash, not falling, |vy| small, lateral speed small
+      const settled =
+        st.impactT <= 0 &&
+        !isFalling &&
+        Math.abs(v.y) <= this.settleVertEps &&
+        lateral <= this.settleLatEps;
+
+      if (!settled) {
+        allSettled = false;
+      }
     }
+
+    if (this.disposing && !this.disposed && allSettled) {
+      for (const drop of this.dropList) {
+        drop.makeInvisible();
+      }
+      this.disposed = true;
+      this.resolveDispose?.();
+    }
+  }
+
+  /**
+   * Stop reusing / spawning drops and resolve once all current drops
+   * have finished falling/splashing. After resolution, drops are frozen.
+   */
+  public dispose(callback: (position: hz.Vec3) => void): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    this.disposing = true;
+    this.disposeCallback = callback;
+    return new Promise<void>((res) => {
+      this.resolveDispose = res;
+    });
   }
 }

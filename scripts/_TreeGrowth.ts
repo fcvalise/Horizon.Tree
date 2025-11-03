@@ -13,6 +13,7 @@ import { OEntityManager } from "_OEntityManager";
 import { estimateTreeProgressCurrent } from "_TreeProgress";
 import { PlayerEvent } from "_PlayerEvent";
 import { OInteractableManager } from "_OInteractableManager";
+import { TreeFlowers } from "_TreeFlower";
 
 export type Bud = {
     position: hz.Vec3;
@@ -45,6 +46,7 @@ export class TreeGrowth {
     private architecture!: TreeArchitecture;
     private tropisms!: TreeTropisms;
     private leaves!: TreeLeaves;
+    private flowers!: TreeFlowers;
 
     private budMap: Map<OEntity, Bud> = new Map();
     private budRoot!: Bud;
@@ -57,11 +59,12 @@ export class TreeGrowth {
         private interactable: OInteractableManager,
         private treeSettings: TreeSettings,
     ) {
-        this.random = new ORandom(position.x * position.z * position.y);
+        this.random = new ORandom(this.treeSettings.seed);
         this.raycast = new ORaycast(this.wrapper);
         this.architecture = new TreeArchitecture(treeSettings, treeSettings.architecture);
         this.tropisms = new TreeTropisms(this.architecture, treeSettings.tropism, this.raycast, this.random);
         this.leaves = new TreeLeaves(this.wrapper, this.manager, treeSettings, treeSettings.leaf, this.random);
+        this.flowers = new TreeFlowers(this.wrapper, this.manager, treeSettings, treeSettings.flower, this.random);
         this.settings = treeSettings.branch;
 
         this.createRoot();
@@ -157,6 +160,30 @@ export class TreeGrowth {
         return false;
     }
 
+    public regrowFlower(): number {
+        let count = 0;
+        this.budMap.forEach((bud, budEntity) => {
+            for (const oe of bud.oEntityList) {
+                if (oe.tags.includes('Petal') && oe.isInvisible) {
+                    count++;
+                    if (oe.makeDynamic()) {
+                        const scale = oe.scale.clone();
+                        oe.scale = hz.Vec3.zero;
+                        oe.tweenTo({
+                            duration: this.random.range(0.6, 1),
+                            scale: scale,
+                            makeStatic: false,
+                            ease: Ease.cubicOut,
+                        }).then(() => {
+                            this.manager.makeCollectible(oe);
+                        })
+                    }
+                }
+            }
+        });
+        return count;
+    }
+
     private async harvest(bud: Bud) {
         for (let i = 0; i < bud.oEntityList.length; i++) {
             const oEntityFall = bud.oEntityList[i];
@@ -175,8 +202,8 @@ export class TreeGrowth {
                         color: OColor.Orange,
                         makeStatic: false
                     })
-                    oEntityFall.makePhysic();
-                    oEntityFall.isCollectible = true;
+                    // oEntityFall.makePhysic();
+                    // oEntityFall.isCollectible = true;
 
                     // Create new leaf
                     // const oEntityNew = this.manager.create();
@@ -246,7 +273,7 @@ export class TreeGrowth {
                 bud.oEntity.position = bud.position;
                 bud.oEntity.rotation = hz.Quaternion.lookRotation(forward);
                 bud.oEntity.scale = hz.Vec3.zero;
-                bud.oEntity.color = OColor.Black;
+                bud.oEntity.color = this.settings.color;
                 // bud.oEntityList.push(bud.oEntity);
                 this.budMap.set(bud.oEntity, bud);
                 bud.oEntity.setTags(['Branch']);
@@ -258,6 +285,7 @@ export class TreeGrowth {
                 })
                 .then(() => {
                     this.leaves.placeLeaves(bud, direction);
+                    this.flowers.placeFlower(bud, direction)
                     this.enqueueSegment(bud, direction, nextPosition);
                 });
 

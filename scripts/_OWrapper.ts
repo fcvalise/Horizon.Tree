@@ -21,6 +21,10 @@ export class OWrapper {
         return taggedList[0];
     }
 
+    public getTaggedObjectList(tag: string) {
+        return this.world.getEntitiesWithTags([tag]);
+    }
+
     public isServer() {
         return this.entity.owner.get() == this.world.getServerPlayer();
     }
@@ -58,6 +62,10 @@ export class OWrapper {
         return this.component.async.setInterval(cb, time * 1000);
     }
 
+    public stopInterval(index: number) {
+        this.component.async.clearInterval(index);
+    }
+
     public waitFrames(frames: number = 1): Promise<void> {
         return new Promise(res => {
             let left = frames;
@@ -66,5 +74,17 @@ export class OWrapper {
                 () => false // never cancel
             );
         });
+    }
+
+    public getPVar(player: hz.Player, key: string) {
+        return this.world.persistentStorage.getPlayerVariable(player, key); 
+    }
+
+    public setPVar(player: hz.Player, key: string, value: number) {
+        this.world.persistentStorage.setPlayerVariable(player, key, value);
+    }
+
+    public incrementPVar(player: hz.Player, key: string) {
+        this.setPVar(player, key, this.getPVar(player, key) + 1);
     }
 }

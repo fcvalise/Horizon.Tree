@@ -16,12 +16,14 @@ export class Library {
     public static treeDescription = 709753422108609;
 
     public static readonly colorMap: Map<hz.Color, number> = new Map([
-        [OColor.LightGreen, 1464325168210012],
-        [OColor.DarkGreen,  1966383200779289],
-        [OColor.Orange,     2044830499680411],
-        [OColor.Black,      1201436798682574],
-        [OColor.White,      2217730035333543],
+        [OColor.LightGreen, 1087382983472090],
+        [OColor.DarkGreen,  1315318057000178],
+        [OColor.Orange,     1360810785440380],
+        [OColor.Black,      1345461367286403],
+        [OColor.White,      709412725523327],
         [OColor.Transparent,2193997667791056],
-        [OColor.Grey,       604005912645605],
+        [OColor.Grey,       818271357605796],
+        [OColor.Pink,       654651697725304],
+        [OColor.Blue,       1870418273554219],
     ]);
 }

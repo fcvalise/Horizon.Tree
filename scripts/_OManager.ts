@@ -12,6 +12,11 @@ import { OInventoryManager } from "_OInventory";
 import { PlayerEvent } from "_PlayerEvent";
 import { OTriggerPool } from "_OTriggerPool";
 import { OInteractableManager } from "_OInteractableManager";
+import { OBee } from "_OBee";
+import { OBeeHive } from "OBeeHive";
+import { OGrid } from "_OGrid";
+import { getLocalizableTextFromRepresentation } from "HorizonI18nUtils";
+import { OMerge } from "_OMerge";
 
 export class OisifManager {
     // public static I: OisifManager; // TODO : Should be removed
@@ -25,9 +30,11 @@ export class OisifManager {
     public trigger!: OTriggerPool;
     public inventory!: OInventoryManager;
 
+    private grid!: OGrid;
+
     private cloud!: OClouds;
-    private terrain!: OTerrain;
-    private fuild!: OFluid;
+    // private terrain!: OTerrain;
+    private fluid!: OFluid;
 
     private treeList: TreeBase[] = [];
     
@@ -37,18 +44,23 @@ export class OisifManager {
         this.wrapper = new OWrapper(component);
         this.pool = new OPoolManager(this.wrapper);
         this.manager = new OEntityManager(this.wrapper, this.pool);
-        this.interactable = new OInteractableManager(this.wrapper);
-        this.trigger = new OTriggerPool(this.wrapper, this.interactable);
         this.inventory = new OInventoryManager(this.wrapper, this.manager);
+        this.interactable = new OInteractableManager(this.wrapper, this.inventory);
+        this.trigger = new OTriggerPool(this.wrapper, this.interactable, this.inventory);
 
         this.cloud = new OClouds(this.wrapper, this.pool, this.random);
-        this.terrain = new OTerrain(this.wrapper, this.manager, this.inventory, this.interactable, this.random, 40, 5);
+        // this.terrain = new OTerrain(this.wrapper, this.manager, this.inventory, this.interactable, this.random, 40, 5);
+        this.grid = new OGrid(this.wrapper, this.manager, this.inventory, this.interactable, this.random);
+
+        new OMerge(this.wrapper, this.manager);
         
-        // this.fuild = new OFluid(this.wrapper, this.manager, new hz.Vec3(0, 10, 0));
+        // this.fluid = new OFluid(this.wrapper, this.manager, new hz.Vec3(0, 10, 0));
+        // this.wrapper.setTimeout(() => {
+        // } , 5);
 
         // this.wrapper.component.connectNetworkBroadcastEvent(OuiProgressEvent, (payload) => {
-        //     if (payload.id == 'Discovered' && payload.percent == 1 && !this.fuild) {
-        //         this.fuild = new OFluid(this.wrapper, this.manager, new hz.Vec3(0, 10, 0));
+        //     if (payload.id == 'Discovered' && payload.percent == 1 && !this.fluid) {
+        //         this.fluid = new OFluid(this.wrapper, this.manager, new hz.Vec3(0, 10, 0));
         //         OEntity.melody!.useScale("mixolydian")
         //         .useKey("D")
         //         .setOctaves(1, 3)
@@ -56,32 +68,35 @@ export class OisifManager {
         //     }
         // })
 
-        this.wrapper.component.connectNetworkBroadcastEvent(OEvent.onTerrainSpawn, (payload) => {
-            const oEntity = this.manager.get(payload.entity);
-            if (!oEntity) return;
-            const terrainPosition = payload.entity.position.get();
-            const terrainScale = payload.entity.scale.get();
-            const treePosition = new hz.Vec3(
-                terrainPosition.x + this.random.range(-terrainScale.x * 0.25, terrainScale.x * 0.25),
-                terrainPosition.y,
-                terrainPosition.z + this.random.range(-terrainScale.y * 0.25, terrainScale.y * 0.25) 
-            )
-            if (hz.Vec3.zero.distance(treePosition) < 7) return;
-            const tree = new TreeBase(this.wrapper, this.manager, this.interactable, treePosition);
-            this.treeList.push(tree);
+        // this.wrapper.component.connectNetworkBroadcastEvent(OEvent.onTerrainSpawn, (payload) => {
+        //     const oEntity = this.manager.get(payload.entity);
+        //     if (!oEntity) return;
+        //     const terrainPosition = payload.entity.position.get();
+        //     const terrainScale = payload.entity.scale.get();
+        //     const treePosition = new hz.Vec3(
+        //         terrainPosition.x + this.random.range(-terrainScale.x * 0.25, terrainScale.x * 0.25),
+        //         terrainPosition.y,
+        //         terrainPosition.z + this.random.range(-terrainScale.y * 0.25, terrainScale.y * 0.25) 
+        //     )
+        //     if (hz.Vec3.zero.distance(treePosition) < 7) return;
+        //     const tree = new TreeBase(this.wrapper, this.manager, this.interactable, treePosition);
+        //     this.treeList.push(tree);
             
-            const rootOEntity = tree.getUnlockableOEntity();
-            const dispose = this.interactable.add(rootOEntity, 2, 'Grow Tree', (player) => {
-                if (this.inventory.get(player)?.has(1)) {
-                    tree.startGrowth();
-                    this.inventory.get(player)?.consume(1, rootOEntity);
-                    this.wrapper.component.async.setTimeout(() => dispose(), 0);
-                }
-            });
-        });
+        //     const rootOEntity = tree.getUnlockableOEntity();
+        //     const dispose = this.interactable.add(rootOEntity, 2, 'Grow Tree', (player) => {
+        //         if (this.inventory.get(player)?.has(1)) {
+        //             tree.startGrowth();
+        //             this.inventory.get(player)?.consume(1, rootOEntity);
+        //             this.wrapper.component.async.setTimeout(() => dispose(), 0);
+        //         }
+        //     });
+        // });
         this.wrapper.component.connectNetworkBroadcastEvent(PlayerEvent.onTouch, (payload) => {
             this.onTouch(payload.hit, payload.player);
         });
+
+        // new OBeeHive(this.wrapper, hz.Vec3.up, this.manager, { levels: 3 });
+
     }
 
     public start() {}

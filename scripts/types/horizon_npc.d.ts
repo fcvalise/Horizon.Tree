@@ -9,6 +9,9 @@ import { Entity, Handedness, HorizonProperty, NetworkEvent, Player, ReadableHori
  * The name of the API.
  */
 export declare const ApiName = "HorizonNpc";
+export { LocomotionResult as NpcLocomotionResult } from 'horizon/core';
+export { LocomotionOptions as NpcLocomotionOptions } from 'horizon/core';
+export { RotationOptions as NpcRotationOptions } from 'horizon/core';
 /**
  * The audio output settings for an {@link Npc.conversation | NPC conversation}.
  */
@@ -198,60 +201,6 @@ export declare enum SpeechBubbleTargetType {
  * engages in {@link Npc.conversation | conversation}.
  */
 export declare type NpcAttentionTarget = Player | Entity;
-/**
- * The options used when a movement command is issued to the NPC.
- */
-export declare type NpcLocomotionOptions = {
-    /**
-     * The NPC's movement speed in meter per second. Defaults to 4.5 m/s.
-     * This value is caped by the player's max speed or an absolute cap of 45 m/s.
-     */
-    movementSpeed?: number;
-    /**
-     * The time in seconds to travel from the NPC's current position to the final position.
-     * The NPC's movement speed will vary to achieve this goal.
-     */
-    travelTime?: number;
-    /**
-     * The NPC's acceleration in m/s^2. Defaults to 30 m/s^2.
-     */
-    acceleration?: number;
-    /**
-     * The NPC's deceleration in m/s^2. Deftaults to 15 m/s^2
-     */
-    deceleration?: number;
-    faceMovementDirection?: boolean;
-};
-/**
- * The possible results of a move action for an NPC.
- */
-export declare enum NpcLocomotionResult {
-    /**
-     * The action is complete.
-     */
-    Complete = 0,
-    /**
-     * The action is canceled.
-     */
-    Canceled = 1,
-    /**
-     * An error occured when attempting the action.
-     */
-    Error = 2
-}
-/**
- * The options that can be specified when issuing a rotation command to an NPC.
- */
-export declare type NpcRotationOptions = {
-    /**
-     * The NPC's rotation speed in degrees per second.
-     */
-    rotationSpeed?: number;
-    /**
-     * The amount of time in seconds for the NPC to complete the desired rotation.
-     */
-    rotationTime?: number;
-};
 /**
  * The result of a request for an NPC to pick up an entity.
  */
@@ -503,6 +452,14 @@ export declare class NpcConversation {
      * A given player must be looking at the NPC for that NPC to listen.
      *
      * @param player - The player to register.
+     * @example
+     * ```
+     * const npc = this.entity.as(Npc);
+     * // Listen for the OnPlayerEnterWorld event
+     * this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerEnterWorld, (player: Player) => {
+     *    npc.conversation.registerParticipant(player);
+     *  });
+     * ```
      */
     registerParticipant(player: Player): Promise<void>;
     /**
@@ -510,6 +467,14 @@ export declare class NpcConversation {
      * The NPC will no longer listen and respond to this player automatically.
      *
      * @param player - The player to unregister.
+     *
+     * @example
+     * ```
+     * // Listen for the OnPlayerExitWorld event
+     * this.connectCodeBlockEvent(this.entity, CodeBlockEvents.OnPlayerExitWorld, (player: Player) => {
+     *   npc.conversation.unregisterParticipant(player);
+     * });
+     * ```
      */
     unregisterParticipant(player: Player): Promise<void>;
     /**
@@ -571,52 +536,6 @@ export declare class NpcPlayer extends Player {
      * Indicates whether the NPC is moving.
      */
     isMoving: ReadableHorizonProperty<boolean>;
-    /**
-     * Indicates whether the NPC is on the ground. true if the NPC is on the
-     * ground, false if the NPC is above, below, or otherwise away from the ground.
-     */
-    isGrounded: ReadableHorizonProperty<boolean>;
-    /**
-     * Indicates whether the NPC is performing a jump.
-     */
-    isJumping: ReadableHorizonProperty<boolean>;
-    /**
-     * Issues a movement command to the NPC. Issuing a new move, rotate, follow, or jump command cancels any previous move command.
-     * @param position - The desired destination.
-     * @param options - Optional parameters.
-     * @returns - A promise describing how the locomotion ended.
-     */
-    moveToPosition(position: Vec3, options?: NpcLocomotionOptions): Promise<NpcLocomotionResult>;
-    /**
-     * Issues a movement command along a path. Issuing a new move, rotate, follow, or jump command cancels any previous move command.
-     * @param path - An array of points to follow, in order.
-     * @param options - Optional parameters
-     * @returns - A promise describing how the locomotion ended.
-     */
-    moveToPositions(path: Array<Vec3>, options?: NpcLocomotionOptions): Promise<NpcLocomotionResult>;
-    /**
-     * Issues a rotation command to change the direction the NPC faces. Issuing a new move, rotate, follow, or jump command cancels any previous move command.
-     * @param direction - The desired facing direction.
-     * @param options - Optional parameters.
-     * @returns - A promise describing how the rotation ended.
-     */
-    rotateTo(direction: Vec3, options?: NpcRotationOptions): Promise<NpcLocomotionResult>;
-    /**
-     * Issues a rotation command to rotate the NPC by a given angle in degrees. Issuing a new move, rotate, follow, or jump command cancels any previous move command.
-     * @param angle - The desired angle change in degrees.
-     * @param options - Optional parameters.
-     * @returns - A promise describing how the rotation ended.
-     */
-    rotateBy(angle: number, options?: NpcRotationOptions): Promise<NpcLocomotionResult>;
-    /**
-     * Stops any movement in progress.
-     */
-    stopMovement(): void;
-    /**
-     * Issues a jump command.
-     * @returns A promise describing how the jump ended.
-     */
-    jump(): Promise<NpcLocomotionResult>;
     /**
      * Gets the entity currently held by the specified hand.
      * @param handedness - The hand to query.

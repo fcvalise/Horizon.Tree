@@ -1,23 +1,50 @@
 import * as hz from "horizon/core";
 import { OEntity } from "_OEntity";
 import { OWrapper } from "_OWrapper";
+import { OInventoryManager } from "_OInventory";
+import { Color } from "horizon/core";
 
 export class Interactable {
+    public interact: (player: hz.Player) => void
+
     constructor(
+        public wrapper: OWrapper,
         public oEntity: OEntity,
         public price: number,
         public infos: string,
-        public interact: (player: hz.Player) => void,
-    ) { }
+        public inventory: OInventoryManager,
+        public interactable: OInteractableManager,
+        public onInteract: (player: hz.Player) => void,
+    ) {
+        this.interact = (player) => {
+            if (this.inventory.get(player)?.has(price)) {
+                this.inventory.get(player)?.consume(price, oEntity!);
+                interactable.delete(this.oEntity)
+                onInteract(player);
+            } else {
+                this.wrapper.world.ui.showPopupForPlayer(player, 'Not enough honey', 1, {
+                position: new hz.Vec3(0, 0.35, 0),
+                fontSize: 2,
+                fontColor: Color.black,
+                // backgroundColor: ,
+                playSound: false,
+                showTimer: false,
+                });
+            }
+        }
+    }
 }
 
 export class OInteractableManager {
     private readonly items = new Set<Interactable>();
 
-    constructor(private wrapper: OWrapper) { }
+    constructor(
+        private wrapper: OWrapper,
+        public inventory: OInventoryManager,
+    ) { }
 
-    add(oEntity: OEntity, price: number, infos: string, interact: (player: hz.Player) => void): () => void {
-        const item = new Interactable(oEntity, price, infos, interact!);
+    add(oEntity: OEntity, price: number, infos: string, onInteract: (player: hz.Player) => void): () => void {
+        const item = new Interactable(this.wrapper, oEntity, price, infos, this.inventory, this, onInteract);
         this.items.add(item);
         return () => this.items.delete(item);
     }

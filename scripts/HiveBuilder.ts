@@ -15,37 +15,29 @@ export class HiveBuilder extends hz.Component<typeof HiveBuilder> {
 
         // Shape
         levels: { type: hz.PropTypes.Number, default: 5 },     // how many stacked tiers
-        baseRadius: { type: hz.PropTypes.Number, default: 0.7 },   // bottom tier radius (meters)
-        topRadius: { type: hz.PropTypes.Number, default: 0.35 },  // top tier radius
-        tierHeight: { type: hz.PropTypes.Number, default: 0.35 },  // height per tier
-        bulge: { type: hz.PropTypes.Number, default: 0.1 },   // +bulge fattens middle tiers
-        twistPerLevelDeg: { type: hz.PropTypes.Number, default: 7.5 },   // slight twist per tier (nice low-poly feel)
-        verticalPadding: { type: hz.PropTypes.Number, default: 0.02 },  // gap between tiers
+        baseRadius: { type: hz.PropTypes.Number, default: 1.6 },   // bottom tier radius (meters)
+        topRadius: { type: hz.PropTypes.Number, default: 0.9 },  // top tier radius
+        tierHeight: { type: hz.PropTypes.Number, default: 0.6 },  // height per tier
+        bulge: { type: hz.PropTypes.Number, default: 0.7 },   // +bulge fattens middle tiers
+        twistPerLevelDeg: { type: hz.PropTypes.Number, default: 5 },   // slight twist per tier (nice low-poly feel)
+        verticalPadding: { type: hz.PropTypes.Number, default: 0.1 },  // gap between tiers
 
         // Entrance (a short dark cylinder pushed into the hive)
         entranceEnabled: { type: hz.PropTypes.Boolean, default: true },
-        entranceRadius: { type: hz.PropTypes.Number, default: 0.18 },
-        entranceDepth: { type: hz.PropTypes.Number, default: 0.22 },
-        entranceHeightL: { type: hz.PropTypes.Number, default: 1 },     // which tier index (0 = bottom)
+        entranceRadius: { type: hz.PropTypes.Number, default: 0.7 },
+        entranceDepth: { type: hz.PropTypes.Number, default: 1 },
+        entranceHeightL: { type: hz.PropTypes.Number, default: 2 },     // which tier index (0 = bottom)
         entranceYawDeg: { type: hz.PropTypes.Number, default: 0 },     // rotate around hive
-
-        // Side pods (little attached cylinders near the base)
-        sidePods: { type: hz.PropTypes.Number, default: 0 },     // 0..3 recommended
-        sidePodRadius: { type: hz.PropTypes.Number, default: 0.28 },
-        sidePodHeight: { type: hz.PropTypes.Number, default: 0.28 },
-        sidePodOffset: { type: hz.PropTypes.Number, default: 0.55 },  // distance from center
-        sidePodYawStart: { type: hz.PropTypes.Number, default: 35 },    // first pod angle (deg)
 
         // Randomness (tiny wobble to avoid “too perfect”)
         seed: { type: hz.PropTypes.Number, default: 1337 },
-        jitterPos: { type: hz.PropTypes.Number, default: 0.0 },   // 0..0.02 nice
-        jitterRotDeg: { type: hz.PropTypes.Number, default: 0.0 },   // 0..1.0 nice
-        jitterScale: { type: hz.PropTypes.Number, default: 0.0 },   // 0..0.02 nice
+        jitterPos: { type: hz.PropTypes.Number, default: 0.1 },   // 0..0.02 nice
+        jitterRotDeg: { type: hz.PropTypes.Number, default: 5 },   // 0..1.0 nice
+        jitterScale: { type: hz.PropTypes.Number, default: 0.1 },   // 0..0.02 nice
     };
 
     private tiers: HiveTierRef[] = [];
     private entrance?: hz.Entity;
-    private pods: hz.Entity[] = [];
     private rngS = 1;
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -134,12 +126,6 @@ export class HiveBuilder extends hz.Component<typeof HiveBuilder> {
         if (this.props.entranceEnabled) {
             this.entrance = await this.spawnEntrance();
         }
-
-        // side pods
-        for (let k = 0; k < Math.max(0, Math.floor(this.props.sidePods)); k++) {
-            const pod = await this.spawnSidePod(k);
-            if (pod) this.pods.push(pod);
-        }
     }
 
     private async spawnCylinder(position: hz.Vec3, rotation: hz.Quaternion, scale: hz.Vec3): Promise<hz.Entity> {
@@ -161,23 +147,6 @@ export class HiveBuilder extends hz.Component<typeof HiveBuilder> {
         const asset = new hz.Asset(BigInt(this.props.entranceMeshId));
         const promise = await this.world.spawnAsset(asset, position, rotation, scale);
         return promise[0];
-    }
-
-    private async spawnSidePod(index: number): Promise<hz.Entity | null> {
-        if (this.tiers.length === 0) return null;
-        const baseTier = this.tiers[0].e;
-        const baseY = baseTier.position.get().y - baseTier.scale.get().y * 0.5 + this.props.sidePodHeight * 0.5;
-
-        const angleDeg = this.props.sidePodYawStart + 360 * (index / Math.max(1, this.props.sidePods));
-        const a = angleDeg.toRadians();
-        const offset = new hz.Vec3(Math.sin(a), 0, Math.cos(a)).mul(this.props.sidePodOffset);
-
-        const asset = new hz.Asset(BigInt(this.props.cylinderMeshId));
-        const scale = new hz.Vec3(this.props.sidePodRadius * 2, this.props.sidePodHeight, this.props.sidePodRadius * 2);
-        let position = this.entity.position.get().add(new hz.Vec3(0, baseY - this.entity.position.get().y, 0)).add(offset);
-        position = this.withJitterPos(position);
-
-        return (await this.world.spawnAsset(asset, position, hz.Quaternion.zero, scale))[0];
     }
 
     // ── tiny jitter helpers to keep it low-poly but alive ─────────────────────

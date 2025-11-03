@@ -13,20 +13,21 @@ import { OUtils } from "_OUtils";
 
 const DefaultSettings: TreeSettings = {
     seed: 'MyTree',
-    maxDepth: 4,
+    maxDepth: 5,
     branch: {
         initialCount: 1,
-        length: 1.9,
+        length: 2.5,
         lengthDecay: 0.98,
         bottomWidth: 0.4,
         topWidth: 0.05,
         chance: 0.4,
         angle: 40,
         rollMax: 15,
+        color: OColor.Black,
         growAfterPrune: false
     },
     tropism: {
-        raysPerBud: 50,
+        raysPerBud: 16,
         phototropismWeight: 1,
         phototropismBoost: 10,
         gravitropismWeight: 0.2,
@@ -39,7 +40,7 @@ const DefaultSettings: TreeSettings = {
     },
     leaf: {
         minBranch: 0.2,
-        scale: 6,
+        scale: 4,
         count: 4,
         petioleLength: 0,
         axialJitter: 0.2,
@@ -47,6 +48,19 @@ const DefaultSettings: TreeSettings = {
         whorlCount: 3,
         branchPhyllotaxy: "Spiral",
         trunkPhyllotaxy: "Spiral"
+    },
+    flower: {
+        scale: 0,
+        peduncleLength: 0.06,
+        tiltDeg: 0,
+        style: "cone",          // default "disc"
+        petalCount: 3,          // default 5
+        petalRadius: 0.4,          // default ≈ scale * 0.8
+        petalAngleJitterDeg: 0,  // default 6
+        petalSizeJitter: 0.1,      // default 0.10 (±10%)
+        petalBrightness: 1,      // default 3
+        petalColor: OColor.White,        // default OColor.White
+        centerColor: OColor.Orange, 
     },
     architecture: {
         growthRhythm: "Rhythmic",
@@ -65,7 +79,7 @@ export function cloneSettings(settings: TreeSettings): TreeSettings {
 export class TreeBase {
     private settings: TreeSettings = DefaultSettings;
 
-    private isGrowing: boolean = false;
+    public isGrowing: boolean = false;
     private unlockable!: OEntity;
     private growth!: TreeGrowth;
 
@@ -76,12 +90,13 @@ export class TreeBase {
         public position: hz.Vec3,
         overrides?: Partial<TreeSettings>
     ) {
-        const random = new ORandom(position.x * position.z * position.y);
-        // this.settings = mergeSettings(DefaultSettings, this.getRandomSettings(position));
-        this.settings = cloneSettings(DefaultSettings);
-        this.settings.branch.length = random.range(2, 4);
-        this.settings.branch.bottomWidth = random.range(0.4, 0.7);
-        this.settings.leaf.scale = random.range(2, 4);
+        const random = new ORandom(this.settings.seed);
+        this.settings = { ...DefaultSettings, ...overrides };
+        // this.settings = mergeSettings(DefaultSettings, overrides);
+        // this.settings = { ...cloneSettings(DefaultSettings), ...overrides };
+        // this.settings.branch.length = random.range(this.settings.branch.length * 0.5, this.settings.branch.length * 1.5);
+        // this.settings.branch.bottomWidth = random.range(this.settings.branch.bottomWidth * 0.5, this.settings.branch.bottomWidth * 1.5);
+        // this.settings.leaf.scale = random.range(this.settings.leaf.scale * 0.5, this.settings.leaf.scale * 0.5);
 
         this.createUnlockable(position);
 
@@ -110,6 +125,10 @@ export class TreeBase {
             this.unlockable.makeInvisible();
             this.wrapper.onUpdateUntil(() => this.growth.step(), () => !this.isGrowing);
         }
+    }
+
+    public regrowFlower(): number {
+        return this.growth.regrowFlower();
     }
 
     private async createUnlockable(position: hz.Vec3) {

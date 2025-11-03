@@ -1,3 +1,5 @@
+import * as hz from "horizon/core";
+
 export type BranchSettings = {
     initialCount: number;
     length: number;
@@ -7,6 +9,7 @@ export type BranchSettings = {
     chance: number;
     angle: number;
     rollMax: number;
+    color: hz.Color;
     growAfterPrune: boolean;
 };
 export type TropismSettings = {
@@ -32,6 +35,20 @@ export type LeafSettings = {
     branchPhyllotaxy: "Spiral" | "Distichous" | "OppositeDecussate" | "Whorled";
     trunkPhyllotaxy: "Spiral" | "Distichous" | "OppositeDecussate" | "Whorled";
 };
+export type FlowerStyle = "disc" | "cup" | "cone" | "bell";
+export type FlowerSettings = {
+  scale: number;                 // e.g. 0.25
+  peduncleLength: number;        // e.g. 0.06
+  tiltDeg?: number;              // default ~8
+  style?: FlowerStyle;           // default "disc"
+  petalCount?: number;           // default 5
+  petalRadius?: number;          // default ≈ scale * 0.8
+  petalAngleJitterDeg?: number;  // default 6
+  petalSizeJitter?: number;      // default 0.10 (±10%)
+  petalBrightness?: number;      // default 3
+  petalColor?: hz.Color;         // default OColor.White
+  centerColor?: hz.Color;        // default OColor.Orange
+};
 export type ArchitectureSettings = {
     growthRhythm: "Continuous" | "Rhythmic";
     flushPeriodFrames: number;
@@ -47,6 +64,7 @@ export type TreeSettings = {
     tropism: TropismSettings;
     render: RenderSettings;
     leaf: LeafSettings;
+    flower: FlowerSettings;
     architecture: ArchitectureSettings;
 };
 

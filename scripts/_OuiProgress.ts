@@ -87,7 +87,7 @@ class OuiProgress extends UIComponent<typeof OuiProgress> {
       ],
       style: {
         width: "20%",
-        height: 40,
+        height: "1.5%",
         layoutOrigin: [0.5, 0.5],
         left: `${this.props.screenOffset.x}%`,
         top: `${this.props.screenOffset.y}%`,

@@ -16,6 +16,11 @@ export class OuiHelper {
     return { x: `${offset.x}%`, y: `${100 - offset.y}%` };
   }
 
+  public static numberToHex01(n: number): string {
+    const value = Math.round(Math.max(0, Math.min(1, n)) * 255);
+    return "#" + value.toString(16).padStart(2, "0");
+  }
+
   /**
    * Build a framed container style: transparent gap (padding) + visible border + rounded inner.
    * Set `snapEvenBorder` to true to avoid thin inner seams on odd border widths.

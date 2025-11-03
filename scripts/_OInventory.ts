@@ -4,10 +4,11 @@ import { OEntityManager } from '_OEntityManager';
 import { OWrapper } from '_OWrapper';
 import { OuiInventoryEvent } from '_OuiInventory';
 import { OColor } from '_OColor';
+import { ORandom } from '_ORandom';
 
 export class OInventoryManager {
   private playerMap: Map<hz.Player, OInventory> = new Map();
-  private readonly enoughDistance = 5;
+  private readonly enoughDistance = 2;
 
   constructor(private wrapper: OWrapper, private manager: OEntityManager) {
     this.wrapper.onPlayerEnter((player) => {
@@ -18,21 +19,14 @@ export class OInventoryManager {
     this.wrapper.onUpdate((_dt) => { this.update(); });
   }
 
-  public getInventory(player: hz.Player): OInventory {
-    return this.playerMap.get(player)!;
-  }
-
   private update() {
     const players = this.wrapper.world.getPlayers();
 
-    for (const oEntity of [...this.manager.allList]) {
-      if (!oEntity.isCollectible) continue;
-
+    for (const oEntity of [...this.manager.collectibleList]) {
       for (const player of players) {
         const d = oEntity.position.distance(player.position.get());
         const isCloseEnough = d < this.enoughDistance && oEntity.isSleeping;
         if (!isCloseEnough) continue;
-
         this.get(player)?.attach(oEntity);
         break;
       }
@@ -45,16 +39,20 @@ export class OInventoryManager {
 }
 
 export class OInventory {
-  private readonly startCount: number = 16;
-  private readonly maxCount: number = 20;
+  private readonly startCount: number = 1;
+  private readonly maxCount: number = 24;
   private readonly socketStepY = 0.15;
   private readonly socketBase = new hz.Vec3(0, 0, -0.5);
 
   private oEntityList: OEntity[] = [];
   private socketIndex: number = 0;
+  private random: ORandom;
+  private particle: hz.ParticleGizmo;
 
   constructor(private wrapper: OWrapper, private manager: OEntityManager, private player: hz.Player) {
     this.wrapper.onUpdateUntil((_dt) => this.fillStart(), () => this.oEntityList.length >= this.startCount);
+    this.random = new ORandom('Oisif');
+    this.particle = this.wrapper.world.getEntitiesWithTags(['OInventory:Particle'])[0].as(hz.ParticleGizmo);
   }
 
   private fillStart() {
@@ -71,11 +69,28 @@ export class OInventory {
       this.oEntityList.push(oEntity);
       this.socketIndex++;
 
-      oEntity.scaleZeroTo(oEntity.scale, 1, false).then(() => {
+      const scale = oEntity.scale;
+      oEntity.scale = hz.Vec3.zero;
+      oEntity.tweenTo({
+        duration: 1,
+        scale: scale,
+        ease: Ease.cubicOut,
+        makeStatic: false,
+      }).then(() => {
         this.createAttachable(oEntity);
         this.rebuildSockets();
+        this.particle.position.set(this.getSocket(0).position);
+        this.wrapper.setTimeout(() => {
+          this.particle.play();
+        }, 0.1);
         // this.updateUI();
       });
+
+      // oEntity.scaleZeroTo(oEntity.scale, 1, false).then(() => {
+      //   this.createAttachable(oEntity);
+      //   this.rebuildSockets();
+      //   // this.updateUI();
+      // });
     } else {
       this.manager.delete(oEntity);
     }
@@ -125,6 +140,11 @@ export class OInventory {
 
   public async consume(count: number, oEntityTarget: OEntity) {
     let taken = 0;
+    if (count == 0) {
+      count = 1;
+    }
+
+    const takenList: OEntity[] = [];
 
     while (taken < count) {
       const idx = this.oEntityList.findIndex(e => !e.isTweening());
@@ -134,68 +154,96 @@ export class OInventory {
 
       // const oEntity = this.oEntityList.shift()!;
       const oEntity = this.oEntityList.pop()!;
+      takenList.push(oEntity);
       oEntity.position = oEntityTarget.position.clone();
       oEntity.rotation = oEntityTarget.rotation.clone();
 
-      const attachable = oEntity.entity?.as(hz.AttachableEntity);
-      attachable?.detach();
+      // if (taken == 0) {
+        const attachable = oEntity.entity?.as(hz.AttachableEntity);
+        attachable?.detach();
+      // }
 
       if (oEntity.entity) {
         oEntity.position = oEntity.entity.position.get();
         oEntity.rotation = oEntityTarget.rotation;
-        oEntity.scale = new hz.Vec3(0.5, 0.5, 0.1);
+        oEntity.scale = new hz.Vec3(0.5, 0.5, 0.1).mul(1 + count * 0.2);
       }
 
-      oEntity.playMelody();
-      await oEntity.tweenTo({
-        duration: 0.4,
-        position: oEntityTarget.position,
-        rotation: oEntityTarget.rotation,
-        ease: Ease.cubicOut,
-        makeStatic: false,
-      })
+      const moveToEntitySocket = async () => {
+        oEntity.playMelody();
+        await oEntity.tweenTo({
+          duration: 0.4,
+          position: oEntityTarget.position,
+          rotation: oEntityTarget.rotation,
+          ease: Ease.cubicOut,
+          makeStatic: false,
+        })
+      }
 
-      const baseRot = oEntityTarget.rotation;
-      const delta = hz.Quaternion.fromAxisAngle(baseRot.getForward(), Math.PI);
-      const finalRot = delta.mul(baseRot);
-      
-      oEntity.playMelody();
-      await oEntity.tweenTo({
-        duration: 0.5,
-        positionGetter: () => positionGetter().add(hz.Vec3.up.mul(3.5)),
-        rotation: finalRot,
-        scale: new hz.Vec3(0.5, 0.5, 0.1),
-        color: OColor.Blue,
-        ease: Ease.cubicOut,
-        makeStatic: false,
-      })
-      oEntity.enableTrail(true);
+      const moveTopEntitySocket = async () => {
+        const baseRot = oEntityTarget.rotation;
+        const delta = hz.Quaternion.fromAxisAngle(baseRot.getForward(), Math.PI);
+        const finalRot = delta.mul(baseRot);
+        const randomPos = this.random.vectorHalf();
+        
+        oEntity.playMelody();
+        await oEntity.tweenTo({
+          duration: 0.5 / count,
+          positionGetter: () => positionGetter().add(hz.Vec3.up.mul(3.5).add(randomPos)),
+          rotation: finalRot,
+          scale: new hz.Vec3(0.5, 0.5, 0.1),
+          color: OColor.Blue,
+          ease: Ease.cubicOut,
+          makeStatic: false,
+        })
+        oEntity.enableTrail(true);
+      }
 
-      oEntity.playMelody();
-      await oEntity.tweenTo({
-        duration: 0.8,
-        rotation: oEntityTarget.rotation,
-        positionGetter: positionGetter,
-        scaleGetter: scaleGetter,
-        color: OColor.DarkGreen,
-        ease: Ease.easeInQuart,
-        makeStatic: false,
-      })
+      const moveToMerge = async () => {
+        oEntity.playMelody();
+        await oEntity.tweenTo({
+          duration: 0.8 / count,
+          rotation: oEntityTarget.rotation,
+          positionGetter: positionGetter,
+          scaleGetter: scaleGetter,
+          color: OColor.DarkGreen,
+          ease: Ease.easeInQuart,
+          makeStatic: false,
+        })
 
-      oEntity.playMelody();
-      await oEntity.tweenTo({
-        duration: 0.8,
-        rotation: oEntityTarget.rotation,
-        positionGetter: positionGetter,
-        scaleGetter: scaleGetter,
-        color: OColor.DarkGreen,
-        ease: Ease.easeInQuart,
-        makeStatic: false,
-      })
-      oEntity.playMelody();
-      oEntity.enableTrail(false);
-      oEntity.makeInvisible();
-      this.manager.delete(oEntity);
+        oEntity.playMelody();
+        await oEntity.tweenTo({
+          duration: 0.8 / count,
+          rotation: oEntityTarget.rotation,
+          positionGetter: positionGetter,
+          scaleGetter: scaleGetter,
+          color: OColor.DarkGreen,
+          ease: Ease.easeInQuart,
+          makeStatic: false,
+        })
+        oEntity.playMelody();
+        oEntity.enableTrail(false);
+        oEntity.makeInvisible();
+        this.manager.delete(oEntity);
+      }
+
+      // if (taken == 0) {
+      //   moveToEntitySocket().then(() => {
+      //     moveTopEntitySocket().then(() => {
+      //       moveToMerge();
+      //     })
+      //   })
+      // } else {
+      //   this.wrapper.setTimeout(() => {
+      //     oEntity.enableTrail(false);
+      //     oEntity.makeInvisible();
+      //     this.manager.delete(oEntity);
+      //   }, 0.05)
+      // }
+      await moveToEntitySocket();
+      await moveTopEntitySocket();
+      await moveToMerge()
+
       this.socketIndex--;
 
       taken++;
@@ -204,6 +252,14 @@ export class OInventory {
     if (taken > 0) {
       this.rebuildSockets();
       // this.updateUI();
+    }
+
+    if (count == 1) {
+      this.fillStart();
+    }
+
+    while (takenList.length > 0) {
+      
     }
   }
 
@@ -260,6 +316,9 @@ export class OInventory {
     this.oEntityList.push(inventoryEntity);
 
     this.rebuildSockets();
+    this.wrapper.incrementPVar(this.player, 'Bees:honeyCount');
+    const score = this.wrapper.getPVar(this.player, 'Bees:honeyCount');
+    this.wrapper.world.leaderboards.setScoreForPlayer('Honey', this.player, score, true);
     // this.manager.delete(oEntity);
     return true;
     // this.updateUI();

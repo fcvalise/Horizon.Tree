@@ -8,7 +8,7 @@ export type ScaleName =
   | "dorian" | "mixolydian" | "wholeTone"
   | "hirajoshi" | "inSen";
 
-type GroupName = "Leaf" | "Branch" | "Terrain" | "Rain" | "Other";
+type GroupName = "Leaf" | "Branch" | "Terrain" | "Rain" | "Hive" | "Other";
 
 type PendingNote = {
   pos: hz.Vec3;
@@ -69,7 +69,8 @@ export class OMelody {
     Leaf:    { offset: 0, octaveBias: +1 },
     Branch:  { offset: 2, octaveBias:  0 },
     Terrain: { offset: 4, octaveBias: -1 },
-    Rain:    { offset: -1, octaveBias: 0 },
+    Rain:    { offset: -2, octaveBias: 0 },
+    Hive:    { offset: 16, octaveBias: -4 },
     Other:   { offset: 0, octaveBias:  0 },
   };
 
@@ -254,6 +255,7 @@ export class OMelody {
     if (s.has("branch") || s.has("branches")) return "Branch";
     if (s.has("terrain")) return "Terrain";
     if (s.has("rain")) return "Rain";
+    if (s.has("hive")) return "Hive";
     return "Other";
   }
 

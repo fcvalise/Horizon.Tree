@@ -25,7 +25,7 @@ export class TreeLeaves {
                 const rightX = hz.Vec3.cross(forward, radial).normalize();
                 const upY = hz.Vec3.cross(radial, rightX).normalize();
                 const scaleValue = this.settings.scale - this.settings.scale * 0.9 * bud.depth / this.treeSettings.maxDepth ;
-                const scale = new hz.Vec3(scaleValue * 0.5, scaleValue, scaleValue * 0.1);
+                const scale = new hz.Vec3(scaleValue * 0.4, scaleValue, 0.05);
                 oEntity.position = nodeOrigin.add(radial.mul(this.settings.petioleLength + scaleValue * 0.5));
                 oEntity.rotation = hz.Quaternion.lookRotation(upY.add(hz.Vec3.up), radial);
                 oEntity.scale = hz.Vec3.zero;
@@ -37,6 +37,8 @@ export class TreeLeaves {
                     makeStatic: true,
                     ease: Ease.cubicOut
                 });
+                // this.manager.makeCollectible(oEntity);
+
                 bud.oEntityList?.push(oEntity);
             }
         } else {

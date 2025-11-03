@@ -19,8 +19,11 @@ export class OPoolManager {
     private availableCount: number = 0;
 
     constructor(private wrapper: OWrapper) {
-        this.getReserve();
+        this.getReserve(null);
         wrapper.component.async.setInterval(() => this.updateUI(), 1000);
+        // wrapper.onPlayerEnter((player) => {
+        //     this.getReserve(player);
+        // })
     }
 
     public count() {
@@ -76,13 +79,14 @@ export class OPoolManager {
         // this.updateUI();
     }
 
-    private async getReserve() {
+    private async getReserve(player: hz.Player | null) {
         const reserve = this.wrapper.world.getEntitiesWithTags(['PoolReserve'])[0];
         const children = reserve.children.get();
         let count = 0;
         for (const child of children) {
             if (count++ >= this.maxCount) { break; }
             const pEntity = new OPoolEntity(child);
+            if (player) child.owner.set(player);
             await this.prepare(pEntity);
             this.pool.push(pEntity);
         }
