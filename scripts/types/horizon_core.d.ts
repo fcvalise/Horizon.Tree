@@ -5226,13 +5226,50 @@ export interface IPersistentStorage {
     setPlayerVariable<T extends PersistentSerializableState>(player: Player, key: string, value: T): void;
 }
 /**
+ * Result of a world variable update operation.
+ */
+export interface WorldVariableUpdateResult<T> {
+    /** Whether the update operation was successful */
+    success: boolean;
+    /**
+     * The updated value of the variable.
+     * If the update operation was not successful
+     * due to WorldVariableUpdateErrorType.CONCURRENT_UPDATE
+     * or WorldVariableUpdateErrorType.UPDATE_THROTTLED,
+     * this will be the value of the variable after the concurrent modification.
+     */
+    value: T;
+    /** The type of error that occurred, if any */
+    errorType?: WorldVariableUpdateErrorType;
+}
+/**
+ * Represents the different types of errors that can occur during world variable updates.
+ */
+export declare enum WorldVariableUpdateErrorType {
+    /**
+     * General update failure
+     */
+    SERVER_ERROR = 0,
+    /**
+     * Update failed due to concurrent modification.
+     * Value set by another update operation is returned in the result.
+     */
+    CONCURRENT_UPDATE = 1,
+    /**
+     * Update failed due to throttling.
+     * Latest value is returned in the result.
+     */
+    UPDATE_THROTTLED = 2
+}
+/**
  * A persistent storage object, which contains a set of functions that interact with persistent variables.
  */
 export interface IPersistentStorageWorld {
     getWorldVariable<T extends PersistentSerializableState>(key: string): T | null;
     getWorldCounter(key: string): number;
     incrementWorldCounterAsync(key: string, amount: number): Promise<number>;
-    setWorldVariableAcrossAllInstancesAsync<T extends PersistentSerializableState>(key: string, value: T): Promise<T>;
+    setWorldVariableAcrossAllInstancesAsync<T extends PersistentSerializableState>(key: string, value: T, allowConcurrentOverride?: true): Promise<T>;
+    setWorldVariableAcrossAllInstancesAsync<T extends PersistentSerializableState>(key: string, value: T, allowConcurrentOverride: false): Promise<WorldVariableUpdateResult<T>>;
     fetchWorldVariableAsync<T extends PersistentSerializableState>(key: string): Promise<T | null>;
 }
 /**

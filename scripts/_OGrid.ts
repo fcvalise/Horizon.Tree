@@ -9,6 +9,7 @@ import { ORandom } from "_ORandom";
 import { OCell } from "_OCell";
 import { OuiProgressEvent } from "_OuiProgress";
 import { OuiMapEvent } from "_OuiMap";
+import { PlayerEvent } from "_PlayerEvent";
 
 export class OGrid {
     private readonly gridSize = 40
@@ -40,6 +41,17 @@ export class OGrid {
     }
 
     private async create() {
+       this.wrapper.onPlayerEnter((player) => {
+            this.wrapper.component.connectNetworkEvent(player, PlayerEvent.onAskStart, () => {
+                const firstCell = this.cellArray[0];
+                if (firstCell) {
+                    firstCell.revealFloor(firstCell);
+                    const position = firstCell!.floor.position!;
+                    this.wrapper.component.sendNetworkEvent(player, PlayerEvent.onGetStart, { position: position });
+                }
+            })
+        })
+
         await OUtils.spiralGridAsync(this.wrapper, 0.01, this.gridSize, this.gridSize, (x, z, i) => {
             const cell = new OCell(
                 this.wrapper,

@@ -13,6 +13,9 @@ import { OFloor } from "OFloor";
 import { OColor } from "_OColor";
 import { OBee } from "_OBee";
 import { OFluid } from "_OFluid";
+import { ODrop } from "_ODrop";
+import { PlayerEvent } from "_PlayerEvent";
+import { OGrass } from "_OGrass";
 
 export type CellSettings = {
     manager: OEntityManager,
@@ -28,10 +31,11 @@ export type CellSettings = {
 export class OCell {
     public floor: OFloor;
     public tree!: TreeBase;
+    public flower!: TreeBase;
     public hive!: OBeeHive;
-    public flowerList: TreeFlowers[] = [];
     public beeList: OBee[] = [];
-    public fluid!: OFluid;
+    public dropList: ODrop[] = [];
+    public grassList: OGrass[] = [];
 
     // neighbors
     public neighbors4: OCell[] = [];
@@ -62,19 +66,19 @@ export class OCell {
     }
 
     public updateIfCurrent(player: hz.Player) {
-        this.revealFloor(player, this);
+        this.revealFloor(this);
         if (this.floor.expanded && this.index == 0 && !this.hive) {
-                this.registerCreateHive(player);
-                // const treePosition = this.floor.position.add(hz.Vec3.forward.mul(2)).add(hz.Vec3.left.mul(-2));
-                // this.tree = new TreeBase(this.wrapper, this.manager, this.interactable, treePosition, {
-                //     seed: `${this.gx}${this.gz}${this.index}`,
-                //     maxDepth: 6,
-                // });
-                // this.tree.startGrowth();
-        } else if (this.floor.expanded && !this.tree && !this.hive) {
+            this.registerCreateHive();
+            // const treePosition = this.floor.position.add(hz.Vec3.forward.mul(2)).add(hz.Vec3.left.mul(-2));
+            // this.tree = new TreeBase(this.wrapper, this.manager, this.interactable, treePosition, {
+            //     seed: `${this.gx}${this.gz}${this.index}`,
+            //     maxDepth: 6,
+            // });
+            // this.tree.startGrowth();
+        } else if (this.floor.expanded && !this.flower && !this.hive) {
             const treePosition = this.computeTreePosition();
             const lerpValue = Math.min(1, Math.max(0, this.index - 8) / 20);
-            this.tree = new TreeBase(this.wrapper, this.manager, this.interactable, treePosition, {
+            this.flower = new TreeBase(this.wrapper, this.manager, this.interactable, treePosition, {
                 seed: `${this.gx}${this.gz}${this.index}`,
                 maxDepth: 2 + Number.lerp(0, 3, lerpValue),
                 branch: {
@@ -87,7 +91,8 @@ export class OCell {
                     angle: 40,
                     rollMax: 15,
                     color: OColor.Black,
-                    growAfterPrune: false
+                    growAfterPrune: false,
+                    growSpeed: 0.1,
                 },
                 flower: {
                     scale: 1 + Number.lerp(0, 1, lerpValue),
@@ -100,7 +105,7 @@ export class OCell {
                     petalSizeJitter: 0.1,      // default 0.10 (±10%)
                     petalBrightness: 1,      // default 3
                     petalColor: OColor.White,        // default OColor.White
-                    centerColor: OColor.Orange, 
+                    centerColor: OColor.Orange,
                 },
                 leaf: {
                     minBranch: 0.4,
@@ -114,13 +119,12 @@ export class OCell {
                     trunkPhyllotaxy: "Spiral"
                 },
             });
-            this.tree.startGrowth();
+            this.flower.startGrowth();
             this.floor.fertilize();
-            this.fluid = new OFluid(this.wrapper, this.manager, this.floor.position.add(hz.Vec3.up.mul(8)));
-            this.fluid.playFor(3);
+            this.makeRain();
             this.wrapper.setInterval(() => {
-                if (this.tree.regrowFlower() > 0) {
-                    this.fluid.playFor(3);
+                if (this.flower.regrowFlower() > 0) {
+                    this.makeRain();
                 }
             }, 40 + this.index);
 
@@ -138,23 +142,45 @@ export class OCell {
         }
     }
 
+    public makeRain() {
+        const dropCount = 8;
+        if (this.dropList.length == 0) {
+            for (let index = 0; index < dropCount; index++) {
+                this.dropList.push(new ODrop(this.wrapper, this.manager))
+                this.grassList.push(new OGrass(this.wrapper, this.manager));
+            }
+        }
+        for (let index = 0; index < dropCount; index++) {
+            this.wrapper.setTimeout(() => {
+                const scale = this.floor.scale;
+                const randomPosition = new hz.Vec3(
+                    this.random.range(-scale.x * 0.3, scale.x * 0.3),
+                    this.random.range(8, 12),
+                    this.random.range(-scale.y * 0.3, scale.y * 0.3));
+                const position = this.floor.oEntity!.position.add(randomPosition);
+                const drop = this.dropList[index];
+                const grass = this.grassList[index];
+
+                drop.launch(position, (position) => { grass.create(position);});
+            }, this.random.next() * 0.6)
+        }
+    }
+
     private addRainInteractable() {
-        this.addInteractable(this.tree.getUnlockableOEntity(), 2, 'Make Rain', () => {
-            this.fluid.playFor(3);
+        this.addInteractable(this.tree.getUnlockableOEntity(), 2, 'Make Rain', (actionPlayer) => {
+            this.makeRain();
             let count = 0;
             for (const neighbor of this.neighbors8) {
-                this.wrapper.setTimeout(() => {
-                    if (neighbor.fluid) {
-                        if (this.tree.regrowFlower() > 0) {
-                            this.fluid.playFor(3);
-                        }
-                        count++;
-                    }
-                }, 3 * count)
+                if (neighbor.flower) {
+                    neighbor.flower.regrowFlower();
+                    neighbor.makeRain();
+                    count++;
+                }
             }
+            this.wrapper.incrementPVar(actionPlayer, 'Bees:rainCount');
             this.wrapper.setTimeout(() => {
                 this.addRainInteractable();
-            }, count * 3 + 20);
+            }, count * 4 + 40);
         })
     }
 
@@ -169,60 +195,61 @@ export class OCell {
         return treePosition;
     }
 
-    private async registerCreateHive(player: hz.Player) {
-        const position = this.floor.position.add(hz.Vec3.left.mul(2));
+    public async registerCreateHive() {
+        const position = this.floor.position;
         this.hive = new OBeeHive(this.wrapper, position, this.manager, { levels: 1 });
         this.wrapper.setTimeout(() => {
             this.hive.rebuild().then(() => {
-                this.addInteractable(this.hive.getTop()!, 1, 'create hive', () => {
-                    this.wrapper.incrementPVar(player, 'Bees:hiveCount');
+                this.addInteractable(this.hive.getTop()!, 1, 'create hive', (actionPlayer) => {
+                    this.wrapper.incrementPVar(actionPlayer, 'Bees:hiveCount');
                     this.hive.set({ levels: 3 });
                     this.hive.rebuild().then(() => {
                         const bee = new OBee(this.wrapper, this.manager);
-                        this.wrapper.incrementPVar(player, 'Bees:beeCount');
+                        this.wrapper.incrementPVar(actionPlayer, 'Bees:beeCount');
                         this.beeList.push(bee);
-                        this.registerUpgradeHive(player);
+                        this.registerUpgradeHive();
                     });
                 })
             });
         }, 2)
     }
 
-    private registerUpgradeHive(player: hz.Player) {
+    private registerUpgradeHive() {
         const nextLevel = this.hive.params.levels + 1;
         if (nextLevel >= 20) return;
         const price = nextLevel * 2;
-        const hiveMaxLevel = this.wrapper.getPVar(player, 'Bees:hiveMaxLevel');
-        if (nextLevel > hiveMaxLevel) {
-            this.wrapper.setPVar(player, 'Bees:hiveMaxLevel', hiveMaxLevel + 1);
-        }
-        this.addInteractable(this.hive.getTop()!, price, 'upgrade hive', () => {
+        this.addInteractable(this.hive.getTop()!, price, 'upgrade hive', (actionPlayer) => {
+            const hiveMaxLevel = this.wrapper.getPVar(actionPlayer, 'Bees:hiveMaxLevel');
+            if (nextLevel > hiveMaxLevel) {
+                this.wrapper.setPVar(actionPlayer, 'Bees:hiveMaxLevel', hiveMaxLevel + 1);
+            }
             this.hive.set({ levels: nextLevel });
             this.hive.rebuild().then(() => {
                 const bee = new OBee(this.wrapper, this.manager);
-                this.wrapper.incrementPVar(player, 'Bees:beeCount');
+                this.wrapper.incrementPVar(actionPlayer, 'Bees:beeCount');
                 this.beeList.push(bee);
-                this.registerUpgradeHive(player);
+                this.registerUpgradeHive();
             });
         })
     }
 
-    private revealFloor(player: hz.Player, cell: OCell) {
+    public revealFloor(cell: OCell) {
         if (cell.floor.settings.index != 0 && cell.neighbors8.filter((c) => (c.floor.expanded)).length == 0) return;
         if (cell.floor.reveal()) {
-            this.addInteractable(cell.floor.oEntity!, Math.max(1, Math.min(20, cell.index - 4)), 'expand', () => {
+            const price = Math.max(1, Math.min(20, cell.index - 4));
+            this.addInteractable(cell.floor.oEntity!, price, 'expand', (actionPlayer) => {
                 cell.floor.expand();
-                this.wrapper.incrementPVar(player, 'Bees:expandCount')
+                this.wrapper.incrementPVar(actionPlayer, 'Bees:expandCount')
                 for (const neighboors of cell.neighbors8) {
                     this.wrapper.setTimeout(() => {
-                        this.revealFloor(player, neighboors);
+                        this.revealFloor(neighboors);
                     }, this.random.range(1, 3));
                 }
             });
         }
     }
 
-    private addInteractable(oEntity: OEntity, price: number, infos: string, action: () => void) {
-        const dispose = this.interactable.add(oEntity!, price, infos, (player) => { dispose(); action(); });
+    private addInteractable(oEntity: OEntity, price: number, infos: string, action: (player: hz.Player) => void) {
+        const dispose = this.interactable.add(oEntity!, price, infos, (player) => { dispose(); action(player); });
     }
 }

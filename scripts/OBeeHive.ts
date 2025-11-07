@@ -57,7 +57,7 @@ const DEFAULTS: BeeHiveParams = {
 
   entranceEnabled: true,
   entranceRadius: 0.7,
-  entranceDepth: 0.3,
+  entranceDepth: 1,
   entranceHeightL: 1,
   entranceYawDeg: 0,
 
@@ -100,14 +100,16 @@ export class OBeeHive {
   }
 
   public async destroy(): Promise<void> {
-    for (const part of this.parts) {
+    for (let index = this.parts.length - 1; index >= 0; index--) {
+      const part = this.parts[index];
       if (part.makeDynamic()) {
-        await part.tweenTo({
-            duration: this.random.range(0.4, 0.6),
-            scale: hz.Vec3.zero,
-            makeStatic: false,
-            ease: Ease.easeOutBounce
-          });
+        part.tweenTo({
+          delay: (this.parts.length - index) * 0.1,
+          duration: this.random.range(0.4, 0.6),
+          scale: hz.Vec3.zero,
+          makeStatic: false,
+          ease: Ease.easeOutBounce
+        });
         part.makeInvisible();
       }
     }
@@ -156,7 +158,11 @@ export class OBeeHive {
       oEntity.rotation = rotation;
       oEntity.scale = scale;
       oEntity.color = OColor.Orange;
-      oEntity.setTags(['Walkable', 'Hive']);
+      if (i == clampedLevels - 1) {
+        oEntity.setTags(['Walkable', 'Hive', 'HiveTop']);
+      } else {
+        oEntity.setTags(['Walkable', 'Hive']);
+      }
       this.tiers.push(oEntity);
       this.parts.push(oEntity);
 
@@ -181,9 +187,10 @@ export class OBeeHive {
           const scale = part.scale;
           part.scale = hz.Vec3.zero;
           part.tweenTo({
+            delay: index * 0.1,
             duration: this.random.range(0.8 + (index * 0.2), 1.2 + (index * 0.2)),
             scale: scale,
-            makeStatic: true,
+            makeStatic: false,
             ease: Ease.easeOutBounce
           }).then(() => {
             readyIndex++;
@@ -211,7 +218,7 @@ export class OBeeHive {
     const yawQ = hz.Quaternion.fromAxisAngle(hz.Vec3.up, yawRad);
     const dir = hz.Quaternion.mulVec3(yawQ, tierRight).normalize();
     const tierPos = tier.position;
-    const position = tierPos.add(dir.mul(tierRadius));
+    const position = tierPos.add(dir.mul(tierRadius)).sub(dir.mul(this.params.entranceDepth * 0.5));
 
     const scale = new hz.Vec3(
       this.params.entranceRadius * 2,
@@ -226,7 +233,7 @@ export class OBeeHive {
     oEntity.rotation = rotation;
     oEntity.scale = scale;
     oEntity.color = OColor.Black;
-    oEntity.setTags(['Entrance', 'Hive']);
+    oEntity.setTags(['HiveEntrance', 'Hive', 'Walkable']);
     return oEntity;
   }
 }

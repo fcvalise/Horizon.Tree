@@ -5,6 +5,13 @@ import { OWrapper } from "_OWrapper";
 import { OColor } from "_OColor";
 import { CellSettings } from "_OCell";
 import { ORandom } from "_ORandom";
+import { LayerType } from "horizon/core";
+import { Vec3 } from "horizon/core";
+import { Color } from "horizon/core";
+import { RaycastTargetType } from "horizon/core";
+import { EntityRaycastHit } from "horizon/core";
+import { OUtils } from "_OUtils";
+import { OGrass } from "_OGrass";
 
 
 export class OFloor {
@@ -56,19 +63,47 @@ export class OFloor {
         if (settings.index == 0) this.scale = this.scale.mul(2); // TODO : Dont know why I need to force that
         // color
         this.color = OColor.LightGreen;
-
+        
         const distance = hz.Vec3.zero.distance(this.position) / this.maxDistance;
         noise -= distance * distance * 0.5;
-        if (noise > 0.2) {
+        if (noise > 0.2 && !this.isObject()) {
             this.hidden = false;
         } else {
             this.hidden = true;
         }
     }
 
+    private isObject(): boolean {
+        return false;
+        const posArray = [new hz.Vec3(0, 0, 0), new hz.Vec3(1, 0, 1), new hz.Vec3(-1, 0, 1), new hz.Vec3(-1, 0, -1), new hz.Vec3(1, 0, -1)]
+        for (let index = 0; index < posArray.length; index++) {
+            const position = this.position.add(hz.Vec3.up.mul(10)).add(posArray[index].mul(this.scale.x * 0.5));
+            const raycast = this.wrapper.entity.as(hz.RaycastGizmo);
+            const raycastHit = raycast.raycast(position, hz.Vec3.down, {
+                layerType: LayerType.Objects,
+                maxDistance: 20,
+                stopOnFirstHit: false
+            });
+            if (raycastHit) {
+                // const oEntity = this.settings.manager.create()
+                // oEntity.position = this.position.add(hz.Vec3.up.mul(10));
+                // oEntity.rotation = hz.Quaternion.lookRotation(hz.Vec3.down);
+                // oEntity.scale = new hz.Vec3(0.1, 0.1, 10);
+                // oEntity.color = raycastHit ? Color.green : Color.red;
+                // if (oEntity.makeDynamic()) {
+                // } else {
+                //     this.wrapper.setInterval(() => {oEntity.makeDynamic();}, 1)
+                // }
+                // console.log((raycastHit as hz.EntityRaycastHit).target.name.get());
+                
+                return true;
+            }
+        }
+        return false;
+    }
+
     public reveal(): boolean {
         if (this.revealed || this.hidden) return false;
-
         this.oEntity = this.settings.manager.create()
         this.oEntity.position = this.position.add(this.settings.random.vector());
         this.oEntity.rotation = this.rotation;
@@ -103,10 +138,9 @@ export class OFloor {
                     duration: 0.4,
                     position: this.position,
                     scale: this.scale,
-                    color: OColor.DarkGreen,
+                    color: OColor.Orange,
                     ease: Ease.quadInOut,
-                    delay: 1.3,
-                    makeStatic: true
+                    makeStatic: false
                 })
             } else {
                 this.expanded = false;
@@ -116,72 +150,15 @@ export class OFloor {
 
     public async fertilize() {
         console.log('fertilize');
-        
-        const random = new ORandom('');
-        for (let index = 0; index < 10; index++) {
-            this.wrapper.setTimeout(() => {
-                this.createGrass(random);
-            }, random.range(1, 3));
+        await OUtils.waitFor(this.wrapper, () => this.oEntity?.isTweening() == false)
+        if (this.oEntity) {
+            this.oEntity.tweenTo({
+                duration: 0.4,
+                color: OColor.DarkGreen,
+                ease: Ease.quadInOut,
+                makeStatic: true
+            })
         }
-    }
-    
-    public createGrass(random: ORandom) {
-        const oEntity = this.settings.manager.create()
-        // choose an up hint (surface normal if you have it)
-        const up = this.rotation.getForward().mul(-1);
-
-        // make the grass right-axis point radially outward from the tile center
-        let desiredRight = this.position.sub(this.position);      // from center to blade
-        // ensure it's perpendicular to up (project out any up component)
-        desiredRight = desiredRight.sub(up.mul(desiredRight.dot(up)));
-
-        // guard against degenerate case (if desiredRight was ~parallel to up)
-        if (desiredRight.length2() < 1e-6) {
-        desiredRight = this.oEntity?.rotation.getRight() ?? new hz.Vec3(1,0,0);
-        }
-
-        const rightDir = desiredRight.normalize();
-        const fwdDir   = rightDir.cross(up).normalize();
-        const randomized = fwdDir.add(random.vectorHalf(fwdDir));
-        
-        // const baseRot = hz.Quaternion.lookRotation(fwdDir, up);
-        // const yaw = hz.Quaternion.fromAxisAngle(up, random.range(0, 360));
-        // oEntity.rotation = yaw.mul(baseRot);// so cross(up, fwd) == right
-
-        oEntity.rotation = hz.Quaternion.lookRotation(randomized, up);
-
-        const scale = new hz.Vec3(random.range(0.3, 0.6), random.range(1, 2), 0.1);
-        const distance = random.range(0, this.scale.x * 0.4);
-        const angle = random.range(0, 360);
-        const right = this.oEntity?.rotation.getRight()!.mul(distance)!;
-        const forward = this.oEntity?.rotation.getForward()!;
-        const position = this.position.add(right.rotateArround(angle, forward))
-        oEntity.position = position;// this.position.add(this.settings.random.vectorHalf());
-        // oEntity.rotation = hz.Quaternion.lookRotation(hz.Vec3.up.mul(2).add(random.vectorHalf()));
-        oEntity.color = OColor.LightGreen;
-        oEntity.setTags(['Grass']);
-            if (oEntity.makeDynamic()) {
-                oEntity.playMelody();
-                oEntity.scale = hz.Vec3.zero;
-                oEntity.tweenTo({
-                    duration: 0.8,
-                    scale: scale,
-                    makeStatic: true
-                })
-            }
-        // const makeDynamic = () => {
-        //     if (oEntity.makeDynamic()) {
-        //         oEntity.playMelody();
-        //         oEntity.scale = hz.Vec3.zero;
-        //         oEntity.tweenTo({
-        //             duration: 0.8,
-        //             scale: scale,
-        //             makeStatic: true
-        //         })
-        //     } else {
-        //         this.wrapper.setTimeout(makeDynamic, 0.01);
-        //     }
-        // }
     }
 
     private easeInExpo(x: number): number {

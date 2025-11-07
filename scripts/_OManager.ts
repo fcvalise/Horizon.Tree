@@ -17,6 +17,11 @@ import { OBeeHive } from "OBeeHive";
 import { OGrid } from "_OGrid";
 import { getLocalizableTextFromRepresentation } from "HorizonI18nUtils";
 import { OMerge } from "_OMerge";
+import { ODrop } from "_ODrop";
+import { OScore } from "_OScore";
+import { OColor } from "_OColor";
+import { OBoatBuilder } from "_OBoat";
+import { ORaft } from "_ORaft";
 
 export class OisifManager {
     // public static I: OisifManager; // TODO : Should be removed
@@ -53,6 +58,18 @@ export class OisifManager {
         this.grid = new OGrid(this.wrapper, this.manager, this.inventory, this.interactable, this.random);
 
         new OMerge(this.wrapper, this.manager);
+        new OScore(this.wrapper);
+
+        this.wrapper.setTimeout(() => {
+            const raft = new ORaft(this.wrapper, hz.Vec3.forward.mul(5), this.manager);
+            raft.rebuild();
+            this.wrapper.setTimeout(() => {
+                this.wrapper.onUpdate((dt) => {
+                    raft.translate(hz.Vec3.forward.mul(dt))
+                })
+            } , 5);
+        } , 5);
+
         
         // this.fluid = new OFluid(this.wrapper, this.manager, new hz.Vec3(0, 10, 0));
         // this.wrapper.setTimeout(() => {

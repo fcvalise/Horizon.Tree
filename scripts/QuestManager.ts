@@ -8,18 +8,61 @@ import { Color } from 'horizon/core';
 class QuestManager extends hz.Component<typeof QuestManager> {
   static propsDefinition = {
     popupPosition: { type: hz.PropTypes.Vec3, default: new hz.Vec3(0, 10, 0) },
+    titleOffset: { type: hz.PropTypes.Vec3, default: new hz.Vec3(0, 10, 0) },
     fontSize: { type: hz.PropTypes.Number, default: 10 },
+    titleFontSize: { type: hz.PropTypes.Number, default: 10 },
     charPerLine: { type: hz.PropTypes.Number, default: 10 },
   };
 
   start() {
     const wrapper = new OWrapper(this);
     const sound = OUtils.getChildWithTag(this.entity, 'Sound')!.as(hz.AudioGizmo);
+
     wrapper.onPlayerEnter((player) => {
-      const sub = this.connectCodeBlockEvent(this.entity, hz.CodeBlockEvents.OnAchievementComplete, (player: hz.Player, scriptID: string) => { 
-        // player.showToastMessage(scriptID);
-        const text = this.formatParagraph(this.getText(scriptID), this.props.charPerLine)
-        this.world.ui.showPopupForPlayer(player, text, 4, {
+      // console.log('Player enter quest manager');
+
+      // const title = this.getTitle('QuestBeeCount');
+      // const titleFont = '<font=roboto-bold sdf><material=roboto-bold sdf>';
+      // const text = this.formatParagraph(this.getText('QuestBeeCount'), this.props.charPerLine);
+      // const texteFont = '<font=roboto-bold sdf><material=roboto-bold sdf>';
+
+      // const quest = `\n<b>${titleFont}${title}</b>\n\n${texteFont}${text}\n\n`;
+
+      // this.world.ui.showPopupForPlayer(player, quest, 8, {
+      //   position: this.props.popupPosition,
+      //   fontSize: this.props.fontSize,
+      //   fontColor: OColor.Orange,
+      //   backgroundColor: Color.white,
+      //   playSound: false,
+      //   showTimer: false,
+      // });
+
+
+      // player.showInfoSlides([
+      //   {
+      //     title: this.getTitle('QuestBeeCount'),
+      //     message: this.getText('QuestBeeCount'),
+      //     // imageUri?: string;
+      //     // style?: InfoSlideStyle;
+      //   },
+      //   {
+      //     title: 'Test',
+      //     message: 'yo',
+      //     // imageUri?: string;
+      //     // style?: InfoSlideStyle;
+      //   }
+      // ])
+
+
+      const sub = this.connectCodeBlockEvent(this.entity, hz.CodeBlockEvents.OnAchievementComplete, (player: hz.Player, scriptID: string) => {
+        const title = this.getTitle(scriptID);
+        const titleFont = '<font=roboto-bold sdf><material=roboto-bold sdf>';
+        const text = this.formatParagraph(this.getText(scriptID), this.props.charPerLine);
+        const texteFont = '<font=roboto-bold sdf><material=roboto-bold sdf>';
+
+        const quest = `\n<b>${titleFont}${title}</b>\n\n${texteFont}${text}\n\n`;
+
+        this.world.ui.showPopupForPlayer(player, quest, 5, {
           position: this.props.popupPosition,
           fontSize: this.props.fontSize,
           fontColor: OColor.Orange,
@@ -27,26 +70,37 @@ class QuestManager extends hz.Component<typeof QuestManager> {
           playSound: false,
           showTimer: false,
         });
-        sound.play({ fade: 1, players : [player] });
-        // hz.InWorldQuest.launchQuestDetailsPanel(player, this.questID);
-        // const achivement = this.entity.as(hz.AchievementsGizmo);
-        // achivement.displayAchievements([this.questID])
+        sound.play({ fade: 1, players: [player] });
       });
-    })    
+    })
   }
 
-    private getText(scriptID: string): string {
+  private getTitle(scriptID: string): string {
     if (scriptID == 'QuestBuildHive')
-      return 'The hive stands tall, your colony finally has a home!'
+      return 'First hive built';
     if (scriptID == 'QuestExpandTerrain')
-      return 'Your island flourishes, stretching farther than ever before!'
+      return 'Island expanded';
     if (scriptID == 'QuestBeeCount')
-      return 'The swarm grows stronger, your buzzing army is complete!'
+      return 'First bee recruited';
     if (scriptID == 'QuestHoney')
-      return 'Your hive glows with golden abundance. Sweet success!'
+      return '200 honey collected';
     if (scriptID == 'QuestRain')
-      return 'The flowers bloom once more — your rains bring life to the land.'
-    return 'missing';
+      return 'Rain unlocked';
+    return 'MISSING TITLE';
+  }
+
+  private getText(scriptID: string): string {
+    if (scriptID == 'QuestBuildHive')
+      return 'Your first hive is complete!';// \n\n the colony finally has a home!';
+    if (scriptID == 'QuestExpandTerrain')
+      return 'You’ve expanded your island';// \n\n new land is ready to flourish!';
+    if (scriptID == 'QuestBeeCount')
+      return 'Your first worker bee joins the colony';// \n\n let the harvest begin!';
+    if (scriptID == 'QuestHoney')
+      return 'You’ve gathered 200 honey';// \n\n proof of a thriving hive!';
+    if (scriptID == 'QuestRain')
+      return 'Rain returns to your island';// \n\n flowers bloom once more!';
+    return 'MISSING DESCRIPTION';
   }
 
   private getTextDescription(scriptID: string): string {
@@ -63,7 +117,7 @@ class QuestManager extends hz.Component<typeof QuestManager> {
     return 'missing';
   }
 
-   public formatParagraph(text: string, maxLineLength: number = 40): string {
+  public formatParagraph(text: string, maxLineLength: number = 40): string {
     const nobreakBefore = [';', ':', ')', '»']; // removed '?' and '!'
     const nobreakAfter = ['(', '«'];
 
@@ -79,7 +133,7 @@ class QuestManager extends hz.Component<typeof QuestManager> {
       const potentialLine = currentLine.length > 0 ? currentLine + ' ' + word : word;
       const lastWord = currentLine.split(' ').pop() || '';
       if ((nobreakBefore.includes(word[0]) && currentLine.length > 0) ||
-          (nobreakAfter.includes(lastWord) && currentLine.length > 0)) {
+        (nobreakAfter.includes(lastWord) && currentLine.length > 0)) {
         currentLine += '\u00A0' + word;
       } else if (potentialLine.length <= maxLineLength) {
         currentLine = potentialLine;

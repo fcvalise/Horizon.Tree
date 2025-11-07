@@ -157,20 +157,29 @@ export class TreeFlowers {
             petal.brightness = this.settings.petalBrightness ?? 3;
             petal.setTags(["Flower", "Petal"]);
 
-            const delay = this.random.range(0, 0.2); // light cascade looks nice
-            this.wrapper.setTimeout(() => {
-                const p = petal.tweenTo({
+            const p = petal.tweenTo({
+                delay: this.random.range(0, 0.4),
+                duration: this.random.range(petalDurMin, petalDurMax),
+                scale: petalScale.mul(3),
+                brightness: 2,
+                color: OColor.Blue,
+                makeStatic: false,
+                ease: Ease.cubicOut,
+            }).then(() => {
+                petal.tweenTo({
                     duration: this.random.range(petalDurMin, petalDurMax),
                     scale: petalScale,
+                    brightness: 1,
+                    color: OColor.Pink,
                     makeStatic: false,
                     ease: Ease.cubicOut,
                 }).then(() => {
                     this.manager.makeCollectible(petal);
-                })
-                petalPromises.push(p);
-                bud.oEntityList?.push(petal);
-            }, delay);
 
+                })
+            })
+            petalPromises.push(p);
+            bud.oEntityList?.push(petal);
         }
 
         // // center disk last (little “pop”)

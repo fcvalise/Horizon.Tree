@@ -2,10 +2,10 @@ import * as hz from 'horizon/core';
 import { OWrapper } from '_OWrapper';
 import { OMobileController } from '_OMobileController';
 import { PlayerRescueModule } from 'PlayerRescueModule';
-import { WorldInventory } from 'horizon/core';
 import LocalCamera from 'horizon/camera';
 import { OUtils } from '_OUtils';
 import { PlayerEvent } from '_PlayerEvent';
+import { OColor } from '_OColor';
 
 export class PlayerLocal extends hz.Component {
   static propsDefinition = {
@@ -16,22 +16,46 @@ export class PlayerLocal extends hz.Component {
 
   private inputMap?: Map<hz.PlayerInputAction, hz.PlayerInput | undefined> = new Map();
   private isMapMode = false;
+  private originGravity = 0;
+  private originLocomotionSpeed = 0;
 
   async start() {
     this.connectCodeBlockEvent(this.entity, hz.CodeBlockEvents.OnPlayerEnterWorld, (player) => {
+      const wrapper = new OWrapper(this);
       this.entity.owner.set(player);
+      wrapper.setPVar(player, 'Bees:currentScore', 0);
     });
     
     const owner = this.entity.owner.get();
     if (owner != this.world.getServerPlayer()) {
+      
       const wrapper = new OWrapper(this);
       this.player = owner;
+      this.attachScore();
+      this.attachLight();
       this.raycast = OUtils.getChildWithTag(this.entity, 'Raycast')!.as(hz.RaycastGizmo);
       owner.sprintMultiplier.set(1);
       owner.jumpSpeed.set(0);
+      this.originLocomotionSpeed = owner.locomotionSpeed.get();
+      owner.locomotionSpeed.set(0);
       LocalCamera.collisionEnabled.set(false);
-      // hz.PlayerControls.disableSystemControls();
+      hz.PlayerControls.disableSystemControls();
       wrapper.onUpdate((dt) => this.autoJump(dt));
+
+      wrapper.setTimeout(() => this.sendNetworkEvent(this.player, PlayerEvent.onAskStart, {}), 1)
+      this.connectNetworkEvent(this.player, PlayerEvent.onGetStart, (payload) => {
+        this.player.position.set(payload.position.add(hz.Vec3.up.mul(20)));
+        this.player.locomotionSpeed.set(this.originLocomotionSpeed);
+        hz.PlayerControls.enableSystemControls();
+      });
+      
+      LocalCamera.setCameraModeFixed({
+        position: hz.Vec3.zero,
+        rotation: hz.Quaternion.lookRotation(hz.Vec3.down.add(hz.Vec3.left.mul(0.01))),
+        duration: 0 });
+        wrapper.setTimeout(() => {
+          LocalCamera.setCameraModePan({ positionOffset: new hz.Vec3(30, 30, 0), duration: 2 });
+        }, 0.1)
 
       wrapper.component.connectNetworkEvent(this.player, PlayerEvent.enableTriggerUI, (payload) => {
         // this.enableInput(this.player, payload.isEnable);
@@ -68,6 +92,31 @@ export class PlayerLocal extends hz.Component {
     }
   }
 
+  private score = 0;
+
+  private attachScore() {
+    const scoreEntity = OUtils.getChildWithTag(this.entity, 'Player:Score')!;
+    const scoreText = OUtils.getChildWithTag(scoreEntity, 'Player:ScoreText')?.as(hz.TextGizmo)!;
+    const attach = scoreEntity.as(hz.AttachableEntity);
+    attach.attachToPlayer(this.player, hz.AttachablePlayerAnchor.Head);
+    
+    this.connectNetworkEvent(this.player, PlayerEvent.onScore, (payload) => {
+      this.score = this.score + payload.value;
+      scoreText.text.set(`<b><font=roboto-bold sdf><material=roboto-bold sdf - drop shadow>${this.score}</b>`);
+    });
+
+    const bagText = OUtils.getChildWithTag(scoreEntity, 'Player:BagText')?.as(hz.TextGizmo)!;
+    this.connectNetworkEvent(this.player, PlayerEvent.onBag, (payload) => {
+      bagText.text.set(`<b><font=roboto-bold sdf><material=roboto-bold sdf - drop shadow>${payload.value==24?'MAX':payload.value}</b>`);
+    });
+  }
+
+  private attachLight() {
+    const lightEntity = OUtils.getChildWithTag(this.entity, 'Player:Light')!;
+    const attach = lightEntity.as(hz.AttachableEntity);
+    attach.attachToPlayer(this.player, hz.AttachablePlayerAnchor.Head);
+  }
+
   private player!: hz.Player;
   private raycast!: hz.RaycastGizmo;
   private maxYVelocity = 1;
@@ -91,8 +140,8 @@ export class PlayerLocal extends hz.Component {
     if (hit) {
       const yDelta = hit.hitPoint.y - playerPosition.y;
       if (yDelta > this.stepHeight) {
-        this.maxYVelocity = yDelta / this.stepHeight;
-        this.player.velocity.set(hz.Vec3.up.mul(this.maxYVelocity).add(playerForward.mul(0.1)));
+        this.maxYVelocity = Math.min(10, yDelta / this.stepHeight);
+        this.player.velocity.set(hz.Vec3.up.mul(this.maxYVelocity));
       }
     }
   }
@@ -151,13 +200,20 @@ hz.Component.register(PlayerLocal);
 
 
 
+
+
+
+
+
 // import * as hz from 'horizon/core';
+// import * as npc from 'horizon/npc';
 // import { OWrapper } from '_OWrapper';
 // import { OMobileController } from '_OMobileController';
 // import { PlayerRescueModule } from 'PlayerRescueModule';
 // import { WorldInventory } from 'horizon/core';
 // import LocalCamera from 'horizon/camera';
 // import { OUtils } from '_OUtils';
+// import { PlayerEvent } from '_PlayerEvent';
 
 // export class PlayerLocal extends hz.Component {
 //   static propsDefinition = {
@@ -188,7 +244,7 @@ hz.Component.register(PlayerLocal);
 //       owner.jumpSpeed.set(0);
 //       wrapper.onUpdate((dt) => this.autoJump(dt));
 
-//       // this.initialize();
+//       this.initialize();
 //       // this.player.avatarScale.set(0.05);
 //     }
 //   }
@@ -202,8 +258,12 @@ hz.Component.register(PlayerLocal);
 //   private autoJump(dt: number) {
 //     // this.maxYVelocity = this.props.maxYVelocity;
 
+//       // const playerPosition = this.player.position.get();
+//       // const locomotion = this.player.moveToPosition(playerPosition.add(this.movementDirection));
+
 //     this.movementDirection = this.movementDirection.mul(4);
 //     let targetVelocity = new hz.Vec3(-this.movementDirection.y, -8, this.movementDirection.x);
+
     
 //     this.raycastDistance = this.props.raycastDistance;
 //     this.stepHeight = this.props.stepHeight;
@@ -213,6 +273,7 @@ hz.Component.register(PlayerLocal);
 //     const forward = this.player.forward.get();
 //     const direction = forward.mul(this.raycastDistance);
 //     const playerPosition = this.player.foot.position.get();
+//     // const playerPosition = this.player.foot.position.get();
 //     const playerForward = this.player.forward.get();
 //     const position = playerPosition.add(direction).add(hz.Vec3.up.mul(10));
 //     const hit = this.raycast.raycast(position, hz.Vec3.down);
@@ -225,7 +286,13 @@ hz.Component.register(PlayerLocal);
 //       }
 //     }
 //     this.player.velocity.set(targetVelocity);
-//     hz.PlayerControls.triggerInputActionDown(hz.PlayerInputAction.LeftXAxis);
+//     this.player.rootRotation.set(hz.Quaternion.lookRotation(new hz.Vec3(targetVelocity.x, 0 , targetVelocity.z)));
+
+//     this.player.playAvatarAnimationLocomotion({
+//       simulatedVelocity: this.player.velocity.get(),
+//       falling: this.player.isGrounded.get()
+//     })
+//     // hz.PlayerControls.triggerInputActionDown(hz.PlayerInputAction.LeftXAxis);
 //   }
 
 
@@ -240,10 +307,10 @@ hz.Component.register(PlayerLocal);
 
 // 		this.particleTouch = this.entity.children.get()[0].as(hz.ParticleGizmo);
 
-// 		this.connectLocalBroadcastEvent(hz.PlayerControls.onFocusedInteractionInputStarted,
+// 		this.connectLocalBroadcastEvent(hz.PlayerControls.onFocusedInteractionInputStarted,  
 // 			(payload: { interactionInfo: hz.InteractionInfo[] }) => this.onFocusedInteractionInputStarted(payload.interactionInfo)
 // 		);
-
+    
 // 		this.connectLocalBroadcastEvent(hz.PlayerControls.onFocusedInteractionInputMoved,
 // 			(payload: { interactionInfo: hz.InteractionInfo[] }) => this.onFocusedInteractionInputMoved(payload.interactionInfo)
 // 		);
@@ -261,6 +328,8 @@ hz.Component.register(PlayerLocal);
 // 	}
 
 // 	private onFocusedInteractionInputStarted(interactionInfos: hz.InteractionInfo[]) {
+//     this.sendNetworkEvent(this.player, PlayerEvent.onTouchUI, {});
+
 // 		for (const interactionInfo of interactionInfos) {
 // 			this.dragLastPositions[interactionInfo.interactionIndex] = interactionInfo.screenPosition;
 // 		}
@@ -274,6 +343,7 @@ hz.Component.register(PlayerLocal);
 // 			if (!start) continue;
 // 			const delta = interactionInfo.screenPosition.sub(start);
 //       this.movementDirection = delta.normalize();
+
 //       // console.log(this.movementDirection);
       
 // 		}

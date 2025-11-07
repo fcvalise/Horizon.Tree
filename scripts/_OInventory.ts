@@ -4,7 +4,12 @@ import { OEntityManager } from '_OEntityManager';
 import { OWrapper } from '_OWrapper';
 import { OuiInventoryEvent } from '_OuiInventory';
 import { OColor } from '_OColor';
+import { OMerge } from '_OMerge';
+import { Vec3 } from 'horizon/core';
 import { ORandom } from '_ORandom';
+import { OUtils } from '_OUtils';
+import { PlayerLocal } from '_PlayerLocal';
+import { PlayerEvent } from '_PlayerEvent';
 
 export class OInventoryManager {
   private playerMap: Map<hz.Player, OInventory> = new Map();
@@ -21,8 +26,9 @@ export class OInventoryManager {
 
   private update() {
     const players = this.wrapper.world.getPlayers();
+    const coinList = this.manager.getTagArray('Coin');
 
-    for (const oEntity of [...this.manager.collectibleList]) {
+    for (const oEntity of coinList) {
       for (const player of players) {
         const d = oEntity.position.distance(player.position.get());
         const isCloseEnough = d < this.enoughDistance && oEntity.isSleeping;
@@ -39,62 +45,256 @@ export class OInventoryManager {
 }
 
 export class OInventory {
-  private readonly startCount: number = 1;
+  private readonly scaleDisplay = new hz.Vec3(0.3, 0.3, 0.1);
+  private readonly scaleWorld = new hz.Vec3(0.5, 0.5, 0.1);
   private readonly maxCount: number = 24;
   private readonly socketStepY = 0.15;
   private readonly socketBase = new hz.Vec3(0, 0, -0.5);
 
+  private random: ORandom;
+  private count = 0;
+  private displayCount = 0;
   private oEntityList: OEntity[] = [];
   private socketIndex: number = 0;
-  private random: ORandom;
-  private particle: hz.ParticleGizmo;
+  private isAttaching: boolean = false;
+  private autoOneDuration = 1;
+  private autoOneTimer = 1;
 
   constructor(private wrapper: OWrapper, private manager: OEntityManager, private player: hz.Player) {
-    this.wrapper.onUpdateUntil((_dt) => this.fillStart(), () => this.oEntityList.length >= this.startCount);
+    this.wrapper.onUpdateUntil(
+      () => this.createDisplay(),
+      () => this.oEntityList.length >= this.maxCount
+    );
+    this.wrapper.onUpdate((dt) => {
+      this.update(dt);
+    })
+    this.wrapper.onUpdate(() => {
+      this.addDisplay();
+      this.removeDisplay();
+    })
     this.random = new ORandom('Oisif');
-    this.particle = this.wrapper.world.getEntitiesWithTags(['OInventory:Particle'])[0].as(hz.ParticleGizmo);
   }
 
-  private fillStart() {
-    if (this.oEntityList.length >= this.startCount) return;
+  public update(dt: number) {
+    if (this.count == 0) {
+      this.autoOneTimer += dt;
+      if (this.autoOneTimer > this.autoOneDuration) {
+        this.count = 1;
+        this.autoOneTimer = 0;
+        this.wrapper.component.sendNetworkEvent(this.player, PlayerEvent.onBag, { value: this.count });
+      }
+    }
+  }
+
+  public has(count: number): boolean {
+    return this.count >= count;
+  }
+
+  public async consume(count: number, oEntityTarget: OEntity) {
+    if (!this.has(count)) return;
+    let takenCount = 0;
+    const takenList: OEntity[] = [];
+
+    while (takenCount < count) {
+      const oEntity = this.manager.create();
+      oEntity.position = this.socketLocalToWorld(this.count);
+      // oEntity.rotation = this.getSocket(this.count);
+      oEntity.scale = hz.Vec3.zero;
+      oEntity.color = OColor.Orange;
+      oEntity.enableTrail(true);
+      oEntity.sync();
+      if (oEntity.makeDynamic()) {
+        oEntity.entity?.collidable.set(false);
+        oEntity.entity?.simulated.set(false);
+        await OUtils.waitFor(this.wrapper, () => oEntity.entity?.collidable.get() == false);
+        oEntity.playMelody();
+        await oEntity.tweenTo({
+          duration: 0.1,
+          position: oEntityTarget.position.add(this.random.vectorHalf()),
+          rotation: this.random.rotation(),
+          scale: this.scaleWorld.mul(2),
+          brightness: 2,
+          ease: Ease.cubicOut,
+          makeStatic: false,
+        });
+        oEntityTarget.tweenTo({
+          duration: 0.1,
+          position: oEntityTarget.position.add(this.random.vectorHalf(hz.Vec3.down).mul(0.3)),
+          scale: oEntityTarget.scale.mul(1.05),
+          ease: Ease.cubicOut,
+          loop: 1,
+          yoyo: true,
+          makeStatic: false,
+        });
+        this.count = Math.max(0, this.count - 1);
+        takenCount++;
+        this.wrapper.component.sendNetworkEvent(this.player, PlayerEvent.onBag, { value: this.count });
+
+        takenList.push(oEntity);
+      } else {
+        this.manager.delete(oEntity);
+      }
+    }
+
+    let index = 1;
+    for (const oEntity of takenList) {
+        oEntity.playMelody();
+        await oEntity.tweenTo({
+          duration: 0.4,
+          positionGetter: () => oEntityTarget.position.add(hz.Vec3.up.mul((index) * this.socketStepY)),
+          rotationGetter: () => oEntityTarget.rotation,
+          scale: this.scaleWorld,
+          ease: Ease.cubicOut,
+          makeStatic: false,
+        });
+        index++;
+    }
+    for (const oEntity of takenList) {
+      await oEntity.tweenTo({
+        duration: 0.4,
+        positionGetter: () => oEntityTarget.position,
+        rotationGetter: () => oEntityTarget.rotation,
+        scaleGetter: () => oEntityTarget.scale,
+        color: oEntityTarget.color,
+        ease: Ease.easeInQuart,
+        makeStatic: false,
+      })
+      oEntityTarget.tweenTo({
+        duration: 0.2,
+        position: oEntityTarget.position.add(this.random.vectorHalf(hz.Vec3.down).mul(0.3)),
+        scale: oEntityTarget.scale.mul(1.05),
+        brightness: 2,
+        color: OColor.Orange,
+        ease: Ease.cubicOut,
+        loop: 1,
+        yoyo: true,
+        makeStatic: false,
+      }).then(() => {
+        oEntityTarget.tweenTo({
+          duration: 0.1,
+          brightness: 1,
+          ease: Ease.cubicOut,
+          makeStatic: false,
+        });
+      });
+      this.wrapper.component.sendNetworkEvent(this.player, PlayerEvent.onScore, { value: 1 });
+
+      oEntity.enableTrail(false);
+      oEntity.playMelody();
+      oEntity.makeInvisible();
+      this.wrapper.setTimeout(() => {
+        this.manager.delete(oEntity);
+      }, 0.1)
+  }
+  }
+
+  public async attach(oEntity: OEntity): Promise<boolean> {
+    if (this.isAttaching) return false;
+    if (this.count >= this.maxCount) return false;
+    const displayEntity = this.oEntityList[this.count++];
+    this.wrapper.component.sendNetworkEvent(this.player, PlayerEvent.onBag, { value: this.count });
+
+    let attachEntity = oEntity;
+    this.isAttaching = true;
+
+    while (oEntity.scale.x > this.scaleWorld.x) {
+      oEntity.scale = oEntity.scale.sub(hz.Vec3.one.mul(OMerge.scaleAddition));
+
+      attachEntity = this.manager.create();
+      attachEntity.position = oEntity.position.add(hz.Vec3.up.mul(oEntity.scale.x));
+      attachEntity.rotation = oEntity.rotation;
+      attachEntity.scale = oEntity.scale;
+      attachEntity.color = OColor.Orange;
+      attachEntity.setTags(['Coin'])
+      if (attachEntity.makeDynamic()) {
+        attachEntity.makePhysic();
+      }
+    }
+
+    const positionGetter = () => displayEntity.entity?.position.get()!;
+    const rotationGetter = () => displayEntity.entity?.rotation.get()!;
+        
+    attachEntity.setTags([]);
+    this.manager.indexMaybeRefresh(oEntity);
+    attachEntity.entity?.collidable.set(false);
+    attachEntity.entity?.simulated.set(false);
+    attachEntity.enableTrail(true);
+    await attachEntity.tweenTo({
+      duration: 0.4,
+      positionGetter: positionGetter,
+      rotationGetter: rotationGetter,
+      makeStatic: false,
+      ease: Ease.cubicOut
+    });
+    attachEntity.enableTrail(false);
+    attachEntity.makeInvisible();
+    this.manager.delete(attachEntity);
+    this.wrapper.incrementPVar(this.player, 'Bees:honeyCount');
+    const score = this.wrapper.getPVar(this.player, 'Bees:honeyCount');
+    this.wrapper.world.leaderboards.setScoreForPlayer('Honey', this.player, score, true);
+    this.isAttaching = false;
+
+    return true;
+  }
+
+  private createDisplay() {
+   if (this.oEntityList.length >= this.maxCount) return;
 
     const oEntity = this.manager.create();
     if (oEntity.makeDynamic()) {
-      oEntity.scale = new hz.Vec3(0.5 * 0.6, 0.5 * 0.6, 0.1);
+      oEntity.scale = hz.Vec3.zero;
       oEntity.color = OColor.Orange;
       oEntity.entity?.collidable.set(false);
       oEntity.entity?.simulated.set(false);
-      oEntity.setTags(['Coin']);
-
-      this.oEntityList.push(oEntity);
-      this.socketIndex++;
-
-      const scale = oEntity.scale;
-      oEntity.scale = hz.Vec3.zero;
-      oEntity.tweenTo({
-        duration: 1,
-        scale: scale,
-        ease: Ease.cubicOut,
-        makeStatic: false,
-      }).then(() => {
+      this.wrapper.setTimeout(() => {
         this.createAttachable(oEntity);
         this.rebuildSockets();
-        this.particle.position.set(this.getSocket(0).position);
-        this.wrapper.setTimeout(() => {
-          this.particle.play();
-        }, 0.1);
-        // this.updateUI();
-      });
-
-      // oEntity.scaleZeroTo(oEntity.scale, 1, false).then(() => {
-      //   this.createAttachable(oEntity);
-      //   this.rebuildSockets();
-      //   // this.updateUI();
-      // });
+        this.oEntityList.push(oEntity);
+        this.socketIndex++;
+      }, 0.1)
     } else {
       this.manager.delete(oEntity);
     }
   }
+
+  private async addDisplay() {
+    if (this.displayCount >= this.maxCount) return;
+    if (this.count >= this.oEntityList.length) return;
+    if (this.count > this.displayCount) {
+      const oEntity = this.oEntityList[this.displayCount];
+      oEntity.tweenTo({
+        duration: 0.5,
+        scale: this.scaleDisplay,
+        brightness: 2,
+        ease: Ease.cubicOut,
+        makeStatic: false,
+      });
+      this.displayCount++;
+    }
+  }
+
+  private async removeDisplay() {
+    if (this.count < this.displayCount) {
+      const idx = this.displayCount - 1;
+      const oEntity = this.oEntityList[idx];
+      oEntity.tweenTo({
+        duration: 0.5,
+        scale: hz.Vec3.zero,
+        brightness: 1,
+        ease: Ease.cubicOut,
+        makeStatic: false,
+      });
+      this.displayCount--;
+    }
+  }
+
+  private createAttachable(oEntity: OEntity) {
+    const attachable = oEntity.entity?.as(hz.AttachableEntity)!;
+    attachable.attachToPlayer(this.player, hz.AttachablePlayerAnchor.Torso);
+    oEntity.enableTrail(false);
+    oEntity.playMelody();
+  }
+
 
   private rebuildSockets() {
     let index = 0;
@@ -112,7 +312,6 @@ export class OInventory {
       index++;
     }
   }
-
   private getSocket(index: number): { position: hz.Vec3, rotation: hz.Quaternion } {
     const position = new hz.Vec3(
       this.socketBase.x,
@@ -123,7 +322,8 @@ export class OInventory {
     return { position, rotation };
   }
 
-  private socketLocalToWorld(local: hz.Vec3): hz.Vec3 {
+  private socketLocalToWorld(index: number): hz.Vec3 {
+    const local = this.getSocket(index).position;
     const torsoPosW = this.player.torso.getPosition(hz.Space.World);
     const f = this.player.forward.get();
     const r = this.player.rootRotation.get().getRight();
@@ -132,203 +332,6 @@ export class OInventory {
       .add(r.mul(local.x))
       .add(u.mul(local.y))
       .add(f.mul(local.z));
-  }
-
-  public has(count: number): boolean {
-    return this.oEntityList.filter(oe => !oe.isTweening()).length >= count;
-  }
-
-  public async consume(count: number, oEntityTarget: OEntity) {
-    let taken = 0;
-    if (count == 0) {
-      count = 1;
-    }
-
-    const takenList: OEntity[] = [];
-
-    while (taken < count) {
-      const idx = this.oEntityList.findIndex(e => !e.isTweening());
-      if (idx === -1) break;
-      const positionGetter = () => oEntityTarget.position;
-      const scaleGetter = () => oEntityTarget.scale;
-
-      // const oEntity = this.oEntityList.shift()!;
-      const oEntity = this.oEntityList.pop()!;
-      takenList.push(oEntity);
-      oEntity.position = oEntityTarget.position.clone();
-      oEntity.rotation = oEntityTarget.rotation.clone();
-
-      // if (taken == 0) {
-        const attachable = oEntity.entity?.as(hz.AttachableEntity);
-        attachable?.detach();
-      // }
-
-      if (oEntity.entity) {
-        oEntity.position = oEntity.entity.position.get();
-        oEntity.rotation = oEntityTarget.rotation;
-        oEntity.scale = new hz.Vec3(0.5, 0.5, 0.1).mul(1 + count * 0.2);
-      }
-
-      const moveToEntitySocket = async () => {
-        oEntity.playMelody();
-        await oEntity.tweenTo({
-          duration: 0.4,
-          position: oEntityTarget.position,
-          rotation: oEntityTarget.rotation,
-          ease: Ease.cubicOut,
-          makeStatic: false,
-        })
-      }
-
-      const moveTopEntitySocket = async () => {
-        const baseRot = oEntityTarget.rotation;
-        const delta = hz.Quaternion.fromAxisAngle(baseRot.getForward(), Math.PI);
-        const finalRot = delta.mul(baseRot);
-        const randomPos = this.random.vectorHalf();
-        
-        oEntity.playMelody();
-        await oEntity.tweenTo({
-          duration: 0.5 / count,
-          positionGetter: () => positionGetter().add(hz.Vec3.up.mul(3.5).add(randomPos)),
-          rotation: finalRot,
-          scale: new hz.Vec3(0.5, 0.5, 0.1),
-          color: OColor.Blue,
-          ease: Ease.cubicOut,
-          makeStatic: false,
-        })
-        oEntity.enableTrail(true);
-      }
-
-      const moveToMerge = async () => {
-        oEntity.playMelody();
-        await oEntity.tweenTo({
-          duration: 0.8 / count,
-          rotation: oEntityTarget.rotation,
-          positionGetter: positionGetter,
-          scaleGetter: scaleGetter,
-          color: OColor.DarkGreen,
-          ease: Ease.easeInQuart,
-          makeStatic: false,
-        })
-
-        oEntity.playMelody();
-        await oEntity.tweenTo({
-          duration: 0.8 / count,
-          rotation: oEntityTarget.rotation,
-          positionGetter: positionGetter,
-          scaleGetter: scaleGetter,
-          color: OColor.DarkGreen,
-          ease: Ease.easeInQuart,
-          makeStatic: false,
-        })
-        oEntity.playMelody();
-        oEntity.enableTrail(false);
-        oEntity.makeInvisible();
-        this.manager.delete(oEntity);
-      }
-
-      // if (taken == 0) {
-      //   moveToEntitySocket().then(() => {
-      //     moveTopEntitySocket().then(() => {
-      //       moveToMerge();
-      //     })
-      //   })
-      // } else {
-      //   this.wrapper.setTimeout(() => {
-      //     oEntity.enableTrail(false);
-      //     oEntity.makeInvisible();
-      //     this.manager.delete(oEntity);
-      //   }, 0.05)
-      // }
-      await moveToEntitySocket();
-      await moveTopEntitySocket();
-      await moveToMerge()
-
-      this.socketIndex--;
-
-      taken++;
-    }
-
-    if (taken > 0) {
-      this.rebuildSockets();
-      // this.updateUI();
-    }
-
-    if (count == 1) {
-      this.fillStart();
-    }
-
-    while (takenList.length > 0) {
-      
-    }
-  }
-
-  public async attach(oEntity: OEntity): Promise<boolean> {
-    if (this.oEntityList.includes(oEntity)) return false;
-    if (this.oEntityList.length >= this.maxCount) return false;
-
-    const inventoryEntity = this.manager.create();
-    inventoryEntity.position = oEntity.position;
-    inventoryEntity.rotation = oEntity.rotation;
-    inventoryEntity.scale = oEntity.scale;
-    inventoryEntity.color = oEntity.color;
-    
-    oEntity.makeInvisible();
-    this.manager.delete(oEntity)
-    
-    inventoryEntity.makeDynamic();
-    inventoryEntity.entity?.collidable.set(false);
-
-    inventoryEntity.enableTrail(true);
-    inventoryEntity.setTags(['Money']);
-
-    const base = inventoryEntity.scale.clone();
-    const index = this.socketIndex++;
-    const socket = this.getSocket(index);
-
-    const targetGetter = () => this.socketLocalToWorld(socket.position);
-
-    await inventoryEntity.tweenTo({
-      duration: 0.9,
-      positionGetter: targetGetter,
-      rotation: socket.rotation,
-      makeStatic: false,
-      ease: Ease.cubicOut
-    });
-
-    await inventoryEntity.tweenTo({
-      duration: 0.12,
-      positionGetter: targetGetter,
-      scale: base.mul(1.15),
-      makeStatic: false,
-      ease: Ease.cubicOut,
-    });
-
-    await inventoryEntity.tweenTo({
-      duration: 0.12,
-      positionGetter: targetGetter,
-      scale: base.mul(0.6),
-      makeStatic: false,
-      ease: Ease.cubicOut,
-    });
-
-    this.createAttachable(inventoryEntity);
-    this.oEntityList.push(inventoryEntity);
-
-    this.rebuildSockets();
-    this.wrapper.incrementPVar(this.player, 'Bees:honeyCount');
-    const score = this.wrapper.getPVar(this.player, 'Bees:honeyCount');
-    this.wrapper.world.leaderboards.setScoreForPlayer('Honey', this.player, score, true);
-    // this.manager.delete(oEntity);
-    return true;
-    // this.updateUI();
-  }
-
-  private createAttachable(oEntity: OEntity) {
-    const attachable = oEntity.entity?.as(hz.AttachableEntity)!;
-    attachable.attachToPlayer(this.player, hz.AttachablePlayerAnchor.Torso);
-    oEntity.enableTrail(false);
-    oEntity.playMelody();
   }
 
   private updateUI() {

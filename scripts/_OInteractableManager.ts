@@ -18,12 +18,13 @@ export class Interactable {
     ) {
         this.interact = (player) => {
             if (this.inventory.get(player)?.has(price)) {
-                this.inventory.get(player)?.consume(price, oEntity!);
+                this.inventory.get(player)?.consume(price, oEntity!).then(() => {
+                    onInteract(player);
+                });
                 interactable.delete(this.oEntity)
-                onInteract(player);
             } else {
                 this.wrapper.world.ui.showPopupForPlayer(player, 'Not enough honey', 1, {
-                position: new hz.Vec3(0, 0.35, 0),
+                position: new hz.Vec3(0, -0.2, 0),
                 fontSize: 2,
                 fontColor: Color.black,
                 // backgroundColor: ,

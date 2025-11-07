@@ -1,4 +1,5 @@
 import { OWrapper } from '_OWrapper';
+import { PlayerEvent } from '_PlayerEvent';
 import * as hz from 'horizon/core';
 
 export class FallRespawn extends hz.Component<typeof FallRespawn> {
@@ -15,9 +16,13 @@ export class FallRespawn extends hz.Component<typeof FallRespawn> {
   override start() {
     this.wrapper = new OWrapper(this);
     this.spawnPointGizmo = this.props.spawnPoint!.as(hz.SpawnPointGizmo);
-    this.wrapper.onPlayerEnter((player) => { this.playerList.push(player); })
+
+    this.wrapper.onPlayerEnter((player) => {
+      this.playerList.push(player);
+    })
     this.wrapper.onPlayerExit((player) => { this.playerList.push(player); })
-    
+
+
     this.connectLocalBroadcastEvent(hz.World.onUpdate, () => {
       this.checkAllPlayers();
     });

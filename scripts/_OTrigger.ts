@@ -113,9 +113,9 @@ export class OTrigger {
         } else {
             this.time = 0;
             if (this.scale.x > 0.02) {
-                this.scale = hz.Vec3.lerp(this.scale, hz.Vec3.zero, dt * 10);
+                this.scale = hz.Vec3.lerp(this.scale, hz.Vec3.zero, dt * 20);
                 this.mesh!.scale.set(this.scale);
-                this.intensity = Number.lerp(this.intensity, 0, dt * 5);
+                this.intensity = Number.lerp(this.intensity, 0, dt * 20);
                 this.light?.intensity.set(this.intensity);
             } else {
                 this.position = hz.Vec3.lerp(this.position, targetPosition, dt * 10);

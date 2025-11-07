@@ -6,6 +6,7 @@ import { Ease, OEntity } from '_OEntity';
 import { TrailGizmo } from 'horizon/core';
 import { OColor } from '_OColor';
 import { ORandom } from '_ORandom';
+import { PlayerLocal } from '_PlayerLocal';
 
 type TargetType = 'Petal' | 'Hive';
 
@@ -18,6 +19,7 @@ export class OBee {
   private target?: { type: TargetType; oEntity: OEntity };
 
   // Movement
+  private direction: hz.Vec3 = hz.Vec3.zero;
   private speed = 4;
   private arriveRadius = 0.6;
   private arriveHiveRadius = 0.9;
@@ -58,10 +60,12 @@ export class OBee {
     const targetPos = this.target.oEntity.position;
     const toTarget = targetPos.sub(pos);
     const dist = toTarget.magnitude();
-    const dir = dist > 1e-4 ? toTarget.normalize() : hz.Vec3.forward;
+    const perlinY = this.random.perlin.noise3(this.direction.x * 6, this.direction.y * 6, this.direction.z * 6);
+    const dir = dist > 1e-4 ? toTarget.add(hz.Vec3.up.mul(perlinY)).normalize() : hz.Vec3.forward;
+    this.direction = hz.Vec3.lerp(this.direction, dir, dt);
 
     const step = Math.min(this.speed * dt, dist);
-    const nextPos = pos.add(dir.mul(step));
+    const nextPos = pos.add(this.direction.mul(step));
     this.head.position.set(nextPos);
 
     if (dist > 1e-4) this.head.rotation.set(hz.Quaternion.lookRotation(dir));
@@ -89,7 +93,7 @@ export class OBee {
       const oEntity = OUtils.closestOEntity(pos, flowerList).oEntity;
       if (oEntity) this.target = { type: 'Petal', oEntity: oEntity };
     } else {
-      const hiveList = this.manager.getTagArray('Entrance') ?? [];
+      const hiveList = this.manager.getTagArray('HiveTop') ?? [];
       const oEntity = OUtils.closestOEntity(pos, hiveList).oEntity;
       if (oEntity) this.target = { type: 'Hive', oEntity: oEntity };
     }
@@ -104,7 +108,7 @@ export class OBee {
     } else {
       for (let index = 0; index < this.load; index++) {
         const coin = this.manager.create();
-        coin.position = target.oEntity.position.add(hz.Vec3.up.mul(3).add(hz.Vec3.left).add(this.random.vectorHalf()));
+        coin.position = target.oEntity.position.add(hz.Vec3.up.mul(3).add(this.random.vectorHalf()));
         coin.rotation = target.oEntity.rotation;
         coin.scale = new hz.Vec3(0.5, 0.5, 0.2);
         coin.color = OColor.Orange;

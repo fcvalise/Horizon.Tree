@@ -11,6 +11,7 @@ export type BranchSettings = {
     rollMax: number;
     color: hz.Color;
     growAfterPrune: boolean;
+    growSpeed: number;
 };
 export type TropismSettings = {
     raysPerBud: number;

@@ -164,18 +164,29 @@ export class TreeGrowth {
         let count = 0;
         this.budMap.forEach((bud, budEntity) => {
             for (const oe of bud.oEntityList) {
-                if (oe.tags.includes('Petal') && oe.isInvisible) {
+                if (oe.tags.includes('Petal') && !oe.isTweening()) {
                     count++;
                     if (oe.makeDynamic()) {
                         const scale = oe.scale.clone();
-                        oe.scale = hz.Vec3.zero;
-                        oe.tweenTo({
-                            duration: this.random.range(0.6, 1),
-                            scale: scale,
+                        const p = oe.tweenTo({
+                            delay: 1.4,
+                            duration: this.random.range(0.6, 1.2),
+                            scale: scale.mul(3),
+                            brightness: 2,
                             makeStatic: false,
+                            color: OColor.Blue,
                             ease: Ease.cubicOut,
                         }).then(() => {
-                            this.manager.makeCollectible(oe);
+                            oe.tweenTo({
+                                duration: this.random.range(0.6, 1.2),
+                                scale: scale,
+                                brightness: 1,
+                                makeStatic: false,
+                                color: OColor.Pink,
+                                ease: Ease.cubicOut,
+                            }).then(() => {
+                                this.manager.makeCollectible(oe);
+                            })
                         })
                     }
                 }
@@ -278,7 +289,7 @@ export class TreeGrowth {
                 this.budMap.set(bud.oEntity, bud);
                 bud.oEntity.setTags(['Branch']);
                 bud.oEntity.tweenTo({
-                    duration: this.random.range(2, 7),
+                    duration: this.random.range(2, 7) * this.settings.growSpeed,
                     scale: new hz.Vec3(width, width, bud.length),
                     makeStatic: true,
                     ease: Ease.cubicOut

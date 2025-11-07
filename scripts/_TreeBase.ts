@@ -24,7 +24,8 @@ const DefaultSettings: TreeSettings = {
         angle: 40,
         rollMax: 15,
         color: OColor.Black,
-        growAfterPrune: false
+        growAfterPrune: false,
+        growSpeed: 1
     },
     tropism: {
         raysPerBud: 16,
